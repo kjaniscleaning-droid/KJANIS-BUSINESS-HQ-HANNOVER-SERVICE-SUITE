@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ServiceMaster Pro - Kjanis Business HQ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // Firebase Config
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-business-suite';
+
+        // Globale States
+        let user = null;
+        let stats = { own: 0, prov: 0, logs: [], partners: [] };
+        
+        // Offizielle Firmendaten (Voreingestellt)
+        const officialData = {
+            company: "Kjani Zharki - Cleaning Service",
+            owner: "Kjani Zharki",
+            address: "Weizenfelder Str. 1, 30419 Hannover",
+            email: "kjaniscleaning@gmx.de",
+            taxId: "25/150/05319",
+            insurance: "0101-601.856.342"
+        };
+
+        // UI Helpers
+        window.showP = (id) => {
+            ['dash', 'find', 'team', 'profile'].forEach(p => {
+                document.getElementById('page-'+p).classList.add('hidden');
+                document.getElementById('n-'+p).classList.remove('text-blue-500');
+            });
+            document.getElementById('page-'+id).classList.remove('hidden');
+            document.getElementById('n-'+id).classList.add('text-blue-500');
+        };
+
+        window.closeModal = () => document.getElementById('modal').classList.add('hidden');
+
+        function popSuccess(title, desc, icon = "✅") {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-icon').innerText = icon;
+            document.getElementById('modal-content').innerText = desc;
+            document.getElementById('modal-actions').innerHTML = `<button onclick="closeModal()" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">Verstanden</button>`;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        // Auth & Data Sync
+        onAuthStateChanged(auth, async (u) => {
+            if (u) {
+                user = u;
+                document.getElementById('user-id-display').innerText = `ID: ${u.uid.substring(0,8)}`;
+                
+                // Sync Profile (Private Data)
+                const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+                onSnapshot(profileRef, (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        document.getElementById('p-company').value = data.company || officialData.company;
+                        document.getElementById('p-tax').value = data.taxId || officialData.taxId;
+                    } else {
+                        setDoc(profileRef, officialData);
+                    }
+                });
+
+                // Sync Stats (Private Data)
+                const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
+                onSnapshot(statsRef, (snap) => {
+                    if (snap.exists()) {
+                        stats = snap.data();
+                        renderStats();
+                    } else {
+                        setDoc(statsRef, { own: 0, prov: 0, logs: [], partners: [] });
+                    }
+                });
+            } else {
+                await signInAnonymously(auth);
+            }
+        });
+
+        function renderStats() {
+            document.getElementById('total-revenue').innerText = (stats.own + stats.prov).toLocaleString('de-DE', {minimumFractionDigits: 2}) + ' €';
+            document.getElementById('stat-own').innerText = stats.own.toLocaleString('de-DE') + ' €';
+            document.getElementById('stat-prov').innerText = stats.prov.toLocaleString('de-DE') + ' €';
+            
+            const logBox = document.getElementById('activity-log');
+            logBox.innerHTML = (stats.logs || []).slice(-3).reverse().map(l => `
+                <div class="bg-slate-800/40 p-3 rounded-xl border border-slate-700 text-[10px] font-medium text-slate-300 animate-in slide-in-from-left duration-300">${l}</div>
+            `).join('');
+
+            const pBox = document.getElementById('partner-list');
+            pBox.innerHTML = (stats.partners || []).map(p => `
+                <div class="bg-slate-800/60 p-4 rounded-2xl border border-slate-700 flex justify-between items-center">
+                    <div><p class="font-black text-xs text-white">${p.name}</p></div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full ${p.status === 'frei' ? 'bg-green-500' : 'bg-orange-500'}"></span>
+                        <span class="text-[9px] uppercase font-black text-slate-400">${p.status}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.saveProfile = async () => {
+            if (!user) return;
+            const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'profile');
+            await updateDoc(profileRef, {
+                company: document.getElementById('p-company').value,
+                taxId: document.getElementById('p-tax').value,
+                lastUpdate: new Date().toISOString()
+            });
+            popSuccess("GESPEICHERT", "Deine offiziellen Daten sind nun in der Cloud hinterlegt.");
+        };
+
+        window.searchJobs = () => {
+            const city = document.getElementById('city-search').value || 'Hannover';
+            const res = document.getElementById('job-results');
+            res.innerHTML = `<div class="text-center py-10 animate-pulse text-blue-400 text-xs uppercase font-bold">Scanne Markt in ${city}...</div>`;
+            
+            setTimeout(() => {
+                const mock = [
+                    { name: 'Bürokomplex Vahrenwald', val: 1250, prov: 187, addr: 'Vahrenwalder Str., Hannover' },
+                    { name: 'Treppenhausreinigung Linden', val: 480, prov: 72, addr: 'Limmerstraße, Hannover' },
+                    { name: 'Glasreinigung Misburg', val: 310, prov: 46, addr: 'Buchholzer Str., Hannover' }
+                ];
+                res.innerHTML = mock.map(j => `
+                    <div class="job-card shadow-lg mb-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <p class="font-black text-sm text-white">${j.name}</p>
+                            <p class="text-green-400 font-black text-lg">${j.val}€</p>
+                        </div>
+                        <p class="text-[9px] text-slate-500 mb-4">${j.addr}</p>
+                        <button onclick='window.showJobDetails(${JSON.stringify(j)})' class="w-full bg-blue-600/10 border border-blue-500/30 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all active:bg-blue-600 active:text-white">Auftrag Prüfen</button>
+                    </div>
+                `).join('');
+            }, 800);
+        };
+
+        window.showJobDetails = (job) => {
+            const freeP = (stats.partners || []).find(p => p.status === 'frei');
+            document.getElementById('modal-title').innerText = job.name;
+            document.getElementById('modal-icon').innerText = "💼";
+            document.getElementById('modal-content').innerText = `Gesamtumsatz: ${job.val}€ | Deine 30% Provision: ${job.prov}€`;
+            
+            let acts = `<button onclick="window.bookJob(${job.val}, '${job.name}', 'own')" class="w-full bg-green-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">Selbst Erledigen</button>`;
+            if(freeP) {
+                acts += `<button onclick="window.bookJob(${job.prov}, '${job.name}', 'prov', '${freeP.name}')" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest">An ${freeP.name} delegieren</button>`;
+            } else {
+                acts += `<p class="text-[9px] text-slate-500 uppercase mt-2">Keine freien Partner verfügbar</p>`;
+            }
+            
+            document.getElementById('modal-actions').innerHTML = acts;
+            document.getElementById('modal').classList.remove('hidden');
+        };
+
+        window.bookJob = async (val, name, type, partnerName = '') => {
+            if (!user) return;
+            const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
+            const logMsg = type === 'own' ? `+${val}€ (Eigen): ${name}` : `+${val}€ Provision: ${name} (via ${partnerName})`;
+            
+            await updateDoc(statsRef, {
+                [type]: (stats[type] || 0) + val,
+                logs: arrayUnion(logMsg)
+            });
+            window.closeModal();
+            popSuccess("ERFOLG", "Der Umsatz wurde deinem Konto gutgeschrieben.");
+        };
+
+        window.findNewCompanies = () => {
+            const list = document.getElementById('acquisition-results');
+            list.classList.remove('hidden');
+            list.innerHTML = '<div class="text-[9px] text-blue-400 animate-pulse py-4 font-bold uppercase tracking-widest">KI-Analyse: Region Hannover...</div>';
+            
+            setTimeout(() => {
+                const results = [
+                    {name: 'Hannover Glanz GmbH', phone: '0511 4455'},
+                    {name: 'Reinigungsdienst Nordstadt', phone: '0511 2211'},
+                    {name: 'Service Team Ricklingen', phone: '0511 7788'}
+                ];
+                list.innerHTML = results.map(c => `
+                    <div class="bg-slate-800 p-3 rounded-xl flex justify-between items-center border border-blue-500/10 mb-2">
+                        <div class="text-left"><p class="font-bold text-xs text-white">${c.name}</p><p class="text-[9px] text-slate-500">${c.phone}</p></div>
+                        <button onclick="window.addPartner('${c.name}', '${c.phone}')" class="bg-blue-600 text-[10px] px-4 py-2 rounded-lg font-black uppercase">Add</button>
+                    </div>
+                `).join('');
+            }, 1200);
+        };
+
+        window.addPartner = async (name, phone) => {
+            if (!user) return;
+            const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
+            await updateDoc(statsRef, {
+                partners: arrayUnion({ id: Date.now(), name, phone, status: 'frei' })
+            });
+            document.getElementById('acquisition-results').classList.add('hidden');
+            popSuccess("NEUER PARTNER", `${name} ist nun Teil deines Netzwerks.`, "🤝");
+        };
+
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        :root { --primary-blue: #3b82f6; --dark-bg: #020617; }
+        body { background-color: var(--dark-bg); color: #f1f5f9; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .blue-gradient-card { background: linear-gradient(135deg, #1e293b 0%, #020617 100%); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 1.5rem; }
+        .nav-bar { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 1.5rem; display: flex; justify-content: space-around; padding: 12px; z-index: 1000; }
+        .nav-btn { display: flex; flex-direction: column; align-items: center; font-size: 0.6rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; transition: all 0.3s; }
+        .nav-btn span:first-child { font-size: 1.2rem; margin-bottom: 2px; }
+        .job-card { background: #111827; border-left: 4px solid #3b82f6; border-radius: 1.25rem; padding: 1.25rem; }
+    </style>
+</head>
+<body class="pb-28">
+
+    <div class="p-6 max-w-md mx-auto">
+        
+        <!-- HEADER -->
+        <header class="flex justify-between items-center mb-10 pt-4">
+            <div>
+                <h1 class="text-2xl font-black italic text-white uppercase tracking-tighter">KJANIS <span class="text-blue-500">CLEANING</span></h1>
+                <p class="text-[9px] text-blue-400 font-black uppercase tracking-[0.2em] mt-1">Hannover Zentrale | Master Suite</p>
+            </div>
+            <div id="user-id-display" class="text-[8px] font-mono text-slate-600 bg-slate-900 px-3 py-1 rounded-full border border-slate-800 italic">ID: Login...</div>
+        </header>
+
+        <!-- DASHBOARD -->
+        <section id="page-dash" class="space-y-6">
+            <div class="blue-gradient-card p-10 text-center relative overflow-hidden">
+                <div class="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
+                <p class="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2">Aktueller Brutto-Umsatz</p>
+                <h2 id="total-revenue" class="text-5xl font-black text-white tracking-tighter">0,00 €</h2>
+                <div class="h-1.5 w-16 bg-blue-600 mx-auto mt-6 rounded-full shadow-[0_0_15px_rgba(37,99,235,0.6)]"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-slate-900/50 p-6 rounded-[2rem] border border-slate-800 text-center">
+                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1 tracking-widest">Eigenarbeit</p>
+                    <p id="stat-own" class="text-xl font-black text-emerald-400 leading-none">0 €</p>
+                </div>
+                <div class="bg-slate-900/50 p-6 rounded-[2rem] border border-slate-800 text-center">
+                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1 tracking-widest">Provisionen</p>
+                    <p id="stat-prov" class="text-xl font-black text-blue-400 leading-none">0 €</p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Aktivitäten-Feed</h3>
+                <div id="activity-log" class="space-y-2"></div>
+            </div>
+        </section>
+
+        <!-- FINDER -->
+        <section id="page-find" class="hidden space-y-4">
+            <div class="blue-gradient-card p-6 shadow-2xl">
+                <h3 class="font-black text-center mb-5 uppercase text-[10px] tracking-[0.3em] text-blue-400">Markt-Analyse Hannover</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="city-search" placeholder="List, Linden, Mitte...">
+                    <button onclick="searchJobs()" class="bg-blue-600 px-5 rounded-xl text-xl shadow-lg shadow-blue-600/30">🔍</button>
+                </div>
+            </div>
+            <div id="job-results" class="space-y-3 pb-10"></div>
+        </section>
+
+        <!-- NETZWERK -->
+        <section id="page-team" class="hidden space-y-4">
+            <div class="blue-gradient-card p-8 text-center">
+                <h3 class="font-black mb-5 uppercase text-[10px] tracking-widest text-blue-400">Partner Akquise</h3>
+                <button onclick="findNewCompanies()" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-600/20">
+                    🌐 KI-SUCHE STARTEN
+                </button>
+                <div id="acquisition-results" class="hidden space-y-3 mt-6"></div>
+            </div>
+            <div class="space-y-3">
+                <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Dein Netzwerk</h4>
+                <div id="partner-list" class="space-y-3 pb-10"></div>
+            </div>
+        </section>
+
+        <!-- SETUP / PROFIL -->
+        <section id="page-profile" class="hidden space-y-6">
+            <div class="blue-gradient-card p-8">
+                <h3 class="font-black mb-6 uppercase text-[10px] text-blue-400 tracking-widest text-center border-b border-slate-800 pb-4">Gewerbliche Stammdaten</h3>
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-[9px] text-slate-500 uppercase font-black ml-1">Firma / Inhaber</label>
+                        <input type="text" id="p-company">
+                    </div>
+                    <div>
+                        <label class="text-[9px] text-slate-500 uppercase font-black ml-1">Steuernummer (Anmelden)</label>
+                        <input type="text" id="p-tax">
+                    </div>
+                    <div class="p-4 bg-slate-950/50 rounded-2xl border border-slate-800">
+                        <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Anschrift</p>
+                        <p class="text-xs text-slate-300 font-bold">Weizenfelder Str. 1, 30419 Hannover</p>
+                        <p class="text-[9px] text-slate-500 uppercase font-black mt-3 mb-1">Versicherung</p>
+                        <p class="text-xs text-slate-300 font-bold">Nr. 0101-601.856.342</p>
+                        <p class="text-[9px] text-slate-500 uppercase font-black mt-3 mb-1">Email</p>
+                        <p class="text-xs text-slate-300 font-bold underline">kjaniscleaning@gmx.de</p>
+                    </div>
+                    <button onclick="saveProfile()" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-600/20 active:scale-95">💾 DATEN AKTUALISIEREN</button>
+                </div>
+            </div>
+            <p class="text-[9px] text-slate-600 text-center italic px-4 leading-relaxed">Alle Daten werden nach strengen Sicherheitsstandards in der Cloud gespeichert und vor unbefugtem Zugriff geschützt.</p>
+        </section>
+
+    </div>
+
+    <!-- NAVIGATION -->
+    <nav class="nav-bar">
+        <button onclick="showP('dash')" id="n-dash" class="nav-btn text-blue-500"><span>📊</span><span>Stats</span></button>
+        <button onclick="showP('find')" id="n-find" class="nav-btn"><span>🔍</span><span>Finder</span></button>
+        <button onclick="showP('team')" id="n-team" class="nav-btn"><span>🤝</span><span>Team</span></button>
+        <button onclick="showP('profile')" id="n-profile" class="nav-btn"><span>📋</span><span>Setup</span></button>
+    </nav>
+
+    <!-- MODAL -->
+    <div id="modal" class="fixed inset-0 bg-slate-950/95 hidden flex items-center justify-center z-[2000] p-6 backdrop-blur-sm">
+        <div class="blue-gradient-card p-8 w-full max-w-sm relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+            <div id="modal-icon" class="text-5xl mb-4 text-center">💎</div>
+            <h2 class="text-xl font-black mb-2 text-white text-center uppercase italic" id="modal-title"></h2>
+            <div id="modal-content" class="text-slate-400 text-sm mb-8 text-center leading-relaxed"></div>
+            <div id="modal-actions" class="space-y-3"></div>
+        </div>
+    </div>
+
+</body>
+</html>
