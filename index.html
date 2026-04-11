@@ -3,32 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kjanis Business HQ - Live Production</title>
+    <title>Kjanis HQ - Master Control</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
         
         :root {
-            --dark-navy: #020617;
-            --mid-navy: #0f172a;
-            --accent-blue: #1d4ed8;
+            --dark: #020617;
+            --blue: #2563eb;
+            --emerald: #10b981;
+            --card-bg: rgba(15, 23, 42, 0.9);
         }
 
         body {
-            background-color: var(--dark-navy);
-            color: #f1f5f9;
+            background-color: var(--dark);
+            color: #f8fafc;
             font-family: 'Inter', sans-serif;
             -webkit-tap-highlight-color: transparent;
+            user-select: none;
             overflow-x: hidden;
         }
 
-        /* [Image of Business Dashboard Background] */
-        .glass-card {
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(30, 58, 138, 0.3);
-            border-radius: 2rem;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8);
+        /*  */
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 2.5rem;
+            box-shadow: 0 30px 70px rgba(0,0,0,0.7);
         }
 
         .nav-bar {
@@ -36,54 +38,61 @@
             bottom: 24px;
             left: 20px;
             right: 20px;
-            background: rgba(2, 6, 23, 0.98);
+            background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(30, 58, 138, 0.4);
-            border-radius: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.8rem;
             display: flex;
             justify-content: space-around;
             padding: 14px;
             z-index: 1000;
         }
 
-        .nav-btn {
+        .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            font-size: 0.65rem;
-            color: #475569;
+            font-size: 0.7rem;
+            color: #64748b;
             font-weight: 800;
             text-transform: uppercase;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .nav-btn.active { color: #3b82f6; transform: translateY(-3px); }
-
-        .privacy-blur { filter: blur(15px); opacity: 0.2; pointer-events: none; }
+        .nav-item.active { 
+            color: #60a5fa; 
+            transform: translateY(-4px); 
+        }
 
         input, select {
-            background: #0f172a !important;
-            border: 1px solid #1e3a8a !important;
+            background: rgba(30, 41, 59, 0.8) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
             color: white !important;
-            border-radius: 14px !important;
-            padding: 16px !important;
-            outline: none;
-            width: 100%;
+            border-radius: 1.25rem !important;
+            padding: 1.25rem !important;
             font-size: 16px;
+            width: 100%;
+            outline: none;
         }
 
-        .job-item {
-            background: #0f172a;
-            border-left: 5px solid var(--accent-blue);
-            border-radius: 1.25rem;
+        .job-card {
+            background: rgba(30, 41, 59, 0.4);
+            border-left: 6px solid var(--blue);
+            border-radius: 1.5rem;
             padding: 1.5rem;
             margin-bottom: 1rem;
+            animation: slideUp 0.4s ease-out;
         }
 
-        #loading-screen {
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #loader {
             position: fixed;
             inset: 0;
-            background: var(--dark-navy);
+            background: var(--dark);
             z-index: 9999;
             display: flex;
             flex-direction: column;
@@ -91,279 +100,240 @@
             justify-content: center;
         }
 
-        #setup-warning {
-            position: fixed;
-            inset: 0;
-            background: #020617;
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 30px;
-            text-align: center;
+        .status-pulse {
+            width: 10px;
+            height: 10px;
+            background: var(--emerald);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--emerald);
         }
     </style>
 </head>
-<body class="pb-32">
+<body class="pb-44">
 
-    <!-- SETUP WARNUNG -->
-    <div id="setup-warning" class="hidden">
-        <div class="glass-card p-10 border-red-900/50 max-w-sm">
-            <h2 class="text-red-500 font-black text-2xl uppercase italic mb-4">⚠️ Cloud-Verbindung</h2>
-            <p class="text-slate-400 text-sm mb-8 font-bold leading-relaxed">
-                Deine Master-Suite ist bereit, aber die Verbindung zur Datenbank fehlt noch. Bitte trage deine Firebase-Keys im Code ein.
-            </p>
-            <p class="text-[9px] text-slate-600">STATUS: WAITING_FOR_KEYS</p>
-        </div>
-    </div>
-
-    <!-- Ladebildschirm -->
-    <div id="loading-screen">
-        <div class="w-12 h-12 border-4 border-blue-900 border-t-blue-500 rounded-full animate-spin mb-6"></div>
-        <p class="text-[10px] font-black uppercase tracking-[0.5em] text-blue-800 text-center">Verbindung zur Cloud...</p>
+    <!-- Ladeschirm -->
+    <div id="loader">
+        <div class="w-16 h-16 border-4 border-slate-900 border-t-blue-500 rounded-full animate-spin mb-8"></div>
+        <p class="text-[11px] font-black uppercase tracking-[0.6em] text-slate-500 italic">Cloud-Sync aktiv</p>
     </div>
 
     <div class="p-6 max-w-md mx-auto">
         
         <header class="flex justify-between items-center mb-10 pt-4">
-            <div>
-                <h1 class="text-2xl font-black italic text-white uppercase tracking-tighter">KJANIS <span class="text-blue-600 underline underline-offset-4">HQ</span></h1>
-                <p class="text-[8px] text-blue-900 font-black uppercase tracking-[0.3em] mt-1 italic leading-none text-center">Cloud Business Suite | Hannover</p>
+            <div class="text-left">
+                <h1 class="text-2xl font-black italic uppercase tracking-tighter text-left">KJANIS <span class="text-blue-500">HQ</span></h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="status-pulse animate-pulse"></div>
+                    <p class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Master Cloud Sync</p>
+                </div>
             </div>
-            <button onclick="togglePrivacy()" class="w-12 h-12 bg-blue-950/50 rounded-2xl flex items-center justify-center border border-blue-900/30 active:scale-90 transition-transform">
-                <svg id="p-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" class="text-blue-600">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
-            </button>
+            <button onclick="togglePrivacy()" class="w-12 h-12 glass-panel flex items-center justify-center text-xl shadow-2xl active:scale-90 transition-transform">🔒</button>
         </header>
 
         <!-- DASHBOARD -->
-        <section id="page-dash" class="space-y-6">
-            <div class="glass-card p-12 text-center relative overflow-hidden shadow-2xl">
-                <p class="text-[10px] text-blue-900 uppercase font-black tracking-[0.2em] mb-4 text-center">Live-Cloud-Gesamtumsatz</p>
-                <h2 id="total-val" class="text-5xl font-black text-white tracking-tighter italic text-center transition-all duration-300">0,00 €</h2>
-                <div class="h-1.5 w-16 bg-blue-700 mx-auto mt-6 rounded-full shadow-[0_0_15px_#1d4ed8]"></div>
+        <section id="p-dash" class="space-y-6">
+            <div class="glass-panel p-12 text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
+                <p class="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-3 text-center">Cloud-Umsatz Gesamt</p>
+                <h2 id="ui-total" class="text-6xl font-black italic tracking-tighter transition-all duration-700 text-center">0,00 €</h2>
+                <p class="text-[8px] mt-6 text-blue-500 font-bold uppercase tracking-widest italic text-center">Hannover Business Intelligence</p>
             </div>
-
-            <div class="grid grid-cols-2 gap-4 text-center">
-                <div class="bg-blue-950/30 p-6 rounded-[2.5rem] border border-blue-900/20 text-center">
-                    <p class="text-[9px] text-blue-800 uppercase font-black mb-1">Eigenumsatz</p>
-                    <p id="v-own" class="text-xl font-black text-emerald-500 leading-none">0 €</p>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="glass-panel p-6 text-center">
+                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Eigenumsatz</p>
+                    <p id="ui-own" class="text-xl font-black text-emerald-400">0 €</p>
                 </div>
-                <div class="bg-blue-950/30 p-6 rounded-[2.5rem] border border-blue-900/20 text-center">
-                    <p class="text-[9px] text-blue-800 uppercase font-black mb-1">Netzwerk (30%)</p>
-                    <p id="v-prov" class="text-xl font-black text-blue-500 leading-none">0 €</p>
+                <div class="glass-panel p-6 text-center">
+                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Provision (30%)</p>
+                    <p id="ui-prov" class="text-xl font-black text-blue-400">0 €</p>
                 </div>
             </div>
 
             <div class="space-y-3">
-                <h3 class="text-[10px] font-black text-blue-950 uppercase tracking-widest ml-1 flex items-center gap-2 text-left">
-                    <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span> Echtzeit Journal
-                </h3>
-                <div id="journal" class="space-y-2"></div>
+                <p class="text-[9px] text-slate-700 font-black uppercase ml-2 tracking-widest text-left">Echtzeit Journal</p>
+                <div id="log-container" class="space-y-2"></div>
             </div>
         </section>
 
         <!-- AUFTRÄGE -->
-        <section id="page-find" class="hidden space-y-4">
-            <div class="glass-card p-8 text-center">
-                <h3 class="font-black mb-6 uppercase text-[10px] tracking-[0.3em] text-blue-600 italic">Auftrag Buchen</h3>
+        <section id="p-jobs" class="hidden space-y-4">
+            <div class="glass-panel p-8 text-center">
+                <h3 class="font-black mb-6 uppercase text-blue-500 italic tracking-widest text-center">Neuer Auftrag</h3>
                 <div class="space-y-4 text-left">
                     <input type="text" id="in-name" placeholder="Kunde / Projektname">
-                    <input type="text" id="in-addr" placeholder="Straße / Ortsteil">
+                    <input type="text" id="in-loc" placeholder="Standort (z.B. Hannover)">
                     <div class="grid grid-cols-2 gap-3">
-                        <input type="number" id="in-price" placeholder="Preis (€)">
+                        <input type="number" id="in-val" placeholder="Summe (€)">
                         <select id="in-type">
-                            <option value="own">Selbst erledigt</option>
-                            <option value="prov">Netzwerk (30%)</option>
+                            <option value="own">Eigenleistung</option>
+                            <option value="prov">Partner (30%)</option>
                         </select>
                     </div>
-                    <button onclick="saveJob()" class="w-full bg-blue-700 py-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all mt-2 shadow-xl">Sicher Buchen</button>
+                    <button onclick="saveJob()" class="w-full bg-blue-600 hover:bg-blue-700 py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-blue-900/40 active:scale-95 transition-all mt-4">In Cloud Speichern</button>
                 </div>
             </div>
-            <div id="job-list" class="space-y-3 pb-10"></div>
-        </section>
-
-        <!-- TEAM -->
-        <section id="page-team" class="hidden space-y-4">
-            <div class="glass-card p-8 text-center">
-                <h3 class="font-black mb-6 uppercase text-[10px] tracking-widest text-blue-600 italic leading-none text-center">Partner Netzwerk</h3>
-                <div class="space-y-4 text-left">
-                    <input type="text" id="p-name" placeholder="Name der Firma">
-                    <input type="tel" id="p-tel" placeholder="Telefonnummer">
-                    <button onclick="savePartner()" class="w-full bg-blue-700 py-5 rounded-2xl font-black text-xs uppercase shadow-xl tracking-widest active:scale-95 transition-all mt-2">Hinzufügen</button>
-                </div>
-            </div>
-            <div id="partner-list" class="space-y-3 pb-10 pt-6"></div>
+            <div id="job-list" class="space-y-3 pb-24"></div>
         </section>
 
         <!-- SETUP -->
-        <section id="page-profile" class="hidden space-y-6">
-            <div class="glass-card p-10 text-center">
-                <h3 class="font-black mb-8 uppercase text-[10px] text-blue-600 tracking-[0.2em] text-center border-b border-blue-900/20 pb-4 italic text-white text-center">Gewerbe-Identität</h3>
-                <div class="space-y-5 text-sm">
-                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3 text-left">
-                        <span class="text-blue-900 font-black uppercase text-[9px]">Inhaber</span>
-                        <span class="font-bold text-white uppercase italic tracking-tighter">Kjani Zharki</span>
+        <section id="p-setup" class="hidden space-y-6">
+            <div class="glass-panel p-10 text-center">
+                <h3 class="font-black mb-8 uppercase text-blue-500 italic border-b border-slate-800 pb-4 text-center">Stammdaten</h3>
+                <div class="space-y-6 text-left">
+                    <div>
+                        <p class="text-[9px] text-slate-500 uppercase font-black mb-1 text-left">Inhaber</p>
+                        <p class="font-bold text-lg italic text-left">Kjani Zharki</p>
                     </div>
-                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3 text-left">
-                        <span class="text-blue-900 font-black uppercase text-[9px]">Steuernummer</span>
-                        <span class="font-bold text-white">25/150/05319</span>
+                    <div>
+                        <p class="text-[9px] text-slate-500 uppercase font-black mb-1 text-left">Steuernummer</p>
+                        <p class="font-bold text-left">25/150/05319</p>
                     </div>
-                    <div class="flex flex-col gap-1 text-left">
-                        <span class="text-blue-900 font-black uppercase text-[9px]">Anschrift</span>
-                        <span class="font-bold text-white leading-tight text-left">Weizenfelder Str. 1<br>30419 Hannover</span>
+                    <div>
+                        <p class="text-[9px] text-slate-500 uppercase font-black mb-1 text-left">Sitz</p>
+                        <p class="font-bold text-sm leading-tight text-left">Weizenfelder Str. 1<br>30419 Hannover</p>
                     </div>
                 </div>
             </div>
-            <p class="text-[8px] text-center text-blue-950 font-black uppercase tracking-[0.5em] mt-10 text-center">© KJANIS CLEANING HQ v1.0 | Cloud-Active</p>
+            <div class="text-center opacity-30 mt-10">
+                <p class="text-[9px] font-bold uppercase tracking-[0.5em] text-center">Master HQ v5.5 • Final</p>
+            </div>
         </section>
 
     </div>
 
-    <!-- NAVIGATION -->
-    <nav class="nav-bar">
-        <button onclick="nav('dash')" id="n-dash" class="nav-btn active"><span>📊</span><span>Dash</span></button>
-        <button onclick="nav('find')" id="n-find" class="nav-btn"><span>🔍</span><span>Jobs</span></button>
-        <button onclick="nav('team')" id="n-team" class="nav-btn"><span>🤝</span><span>Team</span></button>
-        <button onclick="nav('profile')" id="n-profile" class="nav-btn"><span>📋</span><span>Setup</span></button>
+    <!-- NAVBAR -->
+    <nav class="nav-bar shadow-2xl">
+        <button onclick="nav('dash')" id="n-dash" class="nav-item active">
+            <span class="text-xl mb-1">📊</span><span>Übersicht</span>
+        </button>
+        <button onclick="nav('jobs')" id="n-jobs" class="nav-item">
+            <span class="text-xl mb-1">📝</span><span>Jobs</span>
+        </button>
+        <button onclick="nav('setup')" id="n-setup" class="nav-item">
+            <span class="text-xl mb-1">📋</span><span>Daten</span>
+        </button>
     </nav>
 
-    <!-- FIREBASE INTEGRATION -->
+    <!-- FIREBASE LOGIK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // --- DEINE ECHTEN KEYS AUS DEM SCREENSHOT ---
+        // Firebase-Konfiguration
         const firebaseConfig = {
-          apiKey: "AIzaSyCs9tX498OaT9lO1i1tXp_6k-g3uS2XqE",
-          authDomain: "kjani-6a706.firebaseapp.com",
-          projectId: "kjani-6a706",
-          storageBucket: "kjani-6a706.appspot.com",
-          messagingSenderId: "62503034041",
-          appId: "1:62503034041:web:8e1697660c1d2e2b3f46a5"
+            apiKey: "AIzaSyCs9tX498OaT9lO1i1tXp_6k-g3uS2XqE",
+            authDomain: "kjani-6a706.firebaseapp.com",
+            projectId: "kjani-6a706",
+            storageBucket: "kjani-6a706.appspot.com",
+            messagingSenderId: "62503034041",
+            appId: "1:62503034041:web:8e1697660c1d2e2b3f46a5"
         };
         
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'kjani-master-final';
+        const appKey = 'kjani-master-final-v5';
 
-        let user = null;
-        let stats = { own: 0, prov: 0, logs: [], partners: [] };
-        let privacy = false;
+        let userId = null;
+        let stats = { own: 0, prov: 0, logs: [] };
+        let isPrivate = false;
 
-        onAuthStateChanged(auth, u => { 
-            if(u) { 
-                user = u; 
-                init(); 
+        // AUTH START
+        onAuthStateChanged(auth, user => {
+            if(user) {
+                userId = user.uid;
+                syncCloud();
             } else {
                 signInAnonymously(auth);
             }
         });
 
-        function init() {
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
-            onSnapshot(docRef, snap => {
-                stats = snap.exists() ? snap.data() : { own:0, prov:0, logs:[], partners:[] };
+        function syncCloud() {
+            // Dashboard Sync
+            onSnapshot(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), snap => {
+                stats = snap.exists() ? snap.data() : { own: 0, prov: 0, logs: [] };
                 render();
-                document.getElementById('loading-screen').style.display = 'none';
-                document.getElementById('setup-warning').classList.add('hidden');
-            }, (err) => {
-                console.error("Cloud Error:", err);
+                document.getElementById('loader').style.display = 'none';
             });
 
-            const jobsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
-            onSnapshot(jobsRef, snap => {
+            // Jobs Collection Sync
+            onSnapshot(collection(db, 'artifacts', appKey, 'users', userId, 'jobs'), snap => {
                 const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 renderJobs(list);
-                syncTotals(list);
+                calculate(list);
             });
         }
 
-        async function syncTotals(list) {
+        async function calculate(list) {
             let o = 0, p = 0;
-            list.forEach(j => { 
-                if(j.type === 'own') o += Number(j.val); 
-                else p += (Number(j.val) * 0.3); 
+            list.forEach(j => {
+                if(j.type === 'own') o += Number(j.val);
+                else p += (Number(j.val) * 0.3);
             });
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
-            await setDoc(docRef, { ...stats, own:o, prov:p }, { merge: true });
+            await setDoc(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), 
+                { ...stats, own: o, prov: p }, { merge: true });
         }
 
         function render() {
             const total = (stats.own || 0) + (stats.prov || 0);
-            const valEl = document.getElementById('total-val');
-            valEl.innerText = privacy ? "••••,•• €" : total.toLocaleString('de-DE', {minimumFractionDigits:2}) + " €";
+            document.getElementById('ui-total').innerText = isPrivate ? "••••,•• €" : total.toLocaleString('de-DE', {minimumFractionDigits: 2}) + " €";
+            document.getElementById('ui-own').innerText = isPrivate ? "••• €" : (stats.own || 0).toLocaleString('de-DE') + " €";
+            document.getElementById('ui-prov').innerText = isPrivate ? "••• €" : (stats.prov || 0).toLocaleString('de-DE') + " €";
             
-            if(privacy) valEl.classList.add('privacy-blur'); else valEl.classList.remove('privacy-blur');
-            
-            document.getElementById('v-own').innerText = privacy ? "••• €" : (stats.own || 0).toLocaleString('de-DE') + " €";
-            document.getElementById('v-prov').innerText = privacy ? "••• €" : (stats.prov || 0).toLocaleString('de-DE') + " €";
-            
-            document.getElementById('journal').innerHTML = (stats.logs || []).slice(-3).reverse().map(l => 
-                `<div class="bg-blue-950/20 p-4 rounded-2xl border border-blue-900/30 text-[9px] font-bold text-blue-800 text-center">⚡ ${l}</div>`
-            ).join('');
-
-            document.getElementById('partner-list').innerHTML = (stats.partners || []).map(p => 
-                `<div class="glass-card !rounded-2xl p-5 flex justify-between items-center"><div class="text-left"><p class="font-black text-[13px] uppercase italic text-white text-left">${p.name}</p><p class="text-[10px] text-blue-900 font-bold text-left">${p.tel}</p></div></div>`
+            document.getElementById('log-container').innerHTML = (stats.logs || []).slice(-3).reverse().map(l => 
+                `<div class="glass-panel p-4 text-[9px] font-bold text-slate-500 border-none shadow-none text-center">⚡ ${l}</div>`
             ).join('');
         }
 
         function renderJobs(jobs) {
-            const list = document.getElementById('job-list');
-            if(jobs.length === 0) { 
-                list.innerHTML = '<p class="text-center text-slate-800 text-[10px] py-16 italic font-bold uppercase tracking-widest text-center">Warte auf Cloud-Daten...</p>'; 
-                return; 
+            const container = document.getElementById('job-list');
+            if(jobs.length === 0) {
+                container.innerHTML = '<p class="text-center py-24 opacity-20 text-[10px] font-black uppercase tracking-widest text-center text-center">Keine Cloud-Einträge vorhanden</p>';
+                return;
             }
-            list.innerHTML = jobs.reverse().map(j => `
-                <div class="job-item flex justify-between items-center">
-                    <div class="text-left text-left"><p class="font-black text-sm text-white uppercase italic leading-none text-left">${j.name}</p><p class="text-[9px] text-blue-900 font-bold mt-2 uppercase tracking-widest leading-none text-left">${j.addr}</p></div>
-                    <div class="text-right"><p class="text-emerald-500 font-black text-base italic leading-none text-right">${j.val}€</p><button onclick="window.delJob('${j.id}')" class="text-[8px] text-red-900 font-black uppercase mt-2 tracking-widest border border-red-900/20 px-2 py-1 rounded">Löschen</button></div>
+            container.innerHTML = jobs.reverse().map(j => `
+                <div class="job-card flex justify-between items-center">
+                    <div class="text-left text-left"><p class="font-bold text-sm text-left text-left">${j.name}</p><p class="text-[9px] opacity-40 uppercase font-black text-left text-left">${j.loc || 'Hannover'}</p></div>
+                    <div class="text-right text-right"><p class="text-emerald-500 font-bold text-lg tracking-tight text-right text-right">${j.val}€</p><button onclick="window.delJob('${j.id}')" class="text-[8px] text-red-500/50 uppercase font-black mt-1 text-right text-right">Löschen</button></div>
                 </div>`).join('');
         }
 
+        // NAVIGATION
         window.nav = id => {
-            ['dash', 'find', 'team', 'profile'].forEach(p => { 
-                document.getElementById('page-'+p).classList.add('hidden'); 
-                document.getElementById('n-'+p).classList.remove('active'); 
+            ['dash', 'jobs', 'setup'].forEach(p => {
+                document.getElementById('p-'+p).classList.add('hidden');
+                document.getElementById('n-'+p).classList.remove('active');
             });
-            document.getElementById('page-'+id).classList.remove('hidden'); 
+            document.getElementById('p-'+id).classList.remove('hidden');
             document.getElementById('n-'+id).classList.add('active');
         };
 
-        window.togglePrivacy = () => {
-            privacy = !privacy;
-            document.getElementById('p-icon').innerHTML = privacy ? 
-                '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>' :
-                '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
-            render();
-        };
+        window.togglePrivacy = () => { isPrivate = !isPrivate; render(); };
 
         window.saveJob = async () => {
-            const n = document.getElementById('in-name').value, 
-                  a = document.getElementById('in-addr').value, 
-                  v = document.getElementById('in-price').value, 
-                  t = document.getElementById('in-type').value;
-            if(!n || !v) return;
-            const ref = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
-            await setDoc(doc(ref), { name:n, addr:a, val:Number(v), type:t, date: new Date().toISOString() });
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main'), { logs: arrayUnion(`Auftrag: ${n} (${v}€)`) });
-            ['in-name','in-addr','in-price'].forEach(i => document.getElementById(i).value='');
+            const name = document.getElementById('in-name').value;
+            const loc = document.getElementById('in-loc').value;
+            const val = document.getElementById('in-val').value;
+            const type = document.getElementById('in-type').value;
+            if(!name || !val) return;
+            
+            await setDoc(doc(collection(db, 'artifacts', appKey, 'users', userId, 'jobs')), {
+                name, loc, val: Number(val), type, date: new Date().toISOString()
+            });
+            
+            await updateDoc(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), {
+                logs: arrayUnion(`${name}: ${val}€`)
+            });
+            
+            document.getElementById('in-name').value = '';
+            document.getElementById('in-loc').value = '';
+            document.getElementById('job-val').value = '';
         };
 
-        window.savePartner = async () => {
-            const n = document.getElementById('p-name').value, 
-                  t = document.getElementById('p-tel').value;
-            if(!n) return;
-            await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main'), { partners: arrayUnion({name:n, tel:t}) });
-            document.getElementById('p-name').value=''; document.getElementById('p-tel').value='';
-        };
-
-        window.delJob = async id => { 
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', id)); 
+        window.delJob = async id => {
+            await deleteDoc(doc(db, 'artifacts', appKey, 'users', userId, 'jobs', id));
         };
     </script>
 </body>
