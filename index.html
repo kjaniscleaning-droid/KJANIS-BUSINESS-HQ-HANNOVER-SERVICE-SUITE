@@ -254,15 +254,25 @@
 
         <!-- FINDER -->
         <section id="page-find" class="hidden space-y-4">
-            <div class="blue-gradient-card p-6 shadow-2xl">
-                <h3 class="font-black text-center mb-5 uppercase text-[10px] tracking-[0.3em] text-blue-400">Markt-Analyse Hannover</h3>
-                <div class="flex gap-2">
-                    <input type="text" id="city-search" placeholder="List, Linden, Mitte...">
-                    <button onclick="searchJobs()" class="bg-blue-600 px-5 rounded-xl text-xl shadow-lg shadow-blue-600/30">🔍</button>
-                </div>
-            </div>
-            <div id="job-results" class="space-y-3 pb-10"></div>
-        </section>
+  <div class="blue-gradient-card p-6 shadow-2xl">
+    <h3 class="font-black text-center mb-5 uppercase text-[12px] tracking-[0.3em] text-blue-400">
+      Markt-Analyse Hannover
+    </h3>
+    <div class="flex gap-2">
+      <input type="text" 
+             id="city-search" 
+             placeholder="Stadtteil eingeben..." 
+             class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white">
+      <button onclick="searchJobs()" 
+              class="bg-blue-600 px-6 rounded-xl text-white font-bold shadow-lg">
+        🔍
+      </button>
+    </div>
+    <div id="job-results" class="mt-4 space-y-2"></div>
+  </div>
+</section>
+
+
 
         <!-- NETZWERK -->
         <section id="page-team" class="hidden space-y-4">
