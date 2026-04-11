@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kjanis Business HQ - Secure Master Suite</title>
+    <title>Kjanis Business HQ - Live Production</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
@@ -22,7 +22,7 @@
             overflow-x: hidden;
         }
 
-        /* [Bild von modernem Business Dashboard Hintergrund] */
+        /* [Image of Business Dashboard Background] */
         .glass-card {
             background: rgba(15, 23, 42, 0.95);
             backdrop-filter: blur(15px);
@@ -72,14 +72,23 @@
             font-size: 16px;
         }
 
-        input:focus { border-color: #3b82f6 !important; }
-
         .job-item {
             background: #0f172a;
             border-left: 5px solid var(--accent-blue);
             border-radius: 1.25rem;
             padding: 1.5rem;
             margin-bottom: 1rem;
+        }
+
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--dark-navy);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
 
         #setup-warning {
@@ -97,20 +106,21 @@
 </head>
 <body class="pb-32">
 
-    <!-- SETUP WARNUNG (Verschwindet automatisch nach Key-Eingabe) -->
+    <!-- SETUP WARNUNG -->
     <div id="setup-warning" class="hidden">
         <div class="glass-card p-10 border-red-900/50 max-w-sm">
             <h2 class="text-red-500 font-black text-2xl uppercase italic mb-4">⚠️ Cloud-Verbindung</h2>
             <p class="text-slate-400 text-sm mb-8 font-bold leading-relaxed">
                 Deine Master-Suite ist bereit, aber die Verbindung zur Datenbank fehlt noch. Bitte trage deine Firebase-Keys im Code ein.
             </p>
-            <div class="text-left text-[11px] text-blue-400 space-y-3 mb-8 font-mono uppercase">
-                <p>1. Firebase Konsole > Zahnrad > Project Settings</p>
-                <p>2. Scrolle zu "Your Apps" > "Config"</p>
-                <p>3. Kopiere die Werte in index.html ab Zeile 234</p>
-            </div>
             <p class="text-[9px] text-slate-600">STATUS: WAITING_FOR_KEYS</p>
         </div>
+    </div>
+
+    <!-- Ladebildschirm -->
+    <div id="loading-screen">
+        <div class="w-12 h-12 border-4 border-blue-900 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+        <p class="text-[10px] font-black uppercase tracking-[0.5em] text-blue-800 text-center">Verbindung zur Cloud...</p>
     </div>
 
     <div class="p-6 max-w-md mx-auto">
@@ -118,7 +128,7 @@
         <header class="flex justify-between items-center mb-10 pt-4">
             <div>
                 <h1 class="text-2xl font-black italic text-white uppercase tracking-tighter">KJANIS <span class="text-blue-600 underline underline-offset-4">HQ</span></h1>
-                <p class="text-[8px] text-blue-900 font-black uppercase tracking-[0.3em] mt-1 italic">Professional Master System | Hannover</p>
+                <p class="text-[8px] text-blue-900 font-black uppercase tracking-[0.3em] mt-1 italic leading-none text-center">Cloud Business Suite | Hannover</p>
             </div>
             <button onclick="togglePrivacy()" class="w-12 h-12 bg-blue-950/50 rounded-2xl flex items-center justify-center border border-blue-900/30 active:scale-90 transition-transform">
                 <svg id="p-icon" viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2.5" fill="none" class="text-blue-600">
@@ -131,14 +141,14 @@
         <!-- DASHBOARD -->
         <section id="page-dash" class="space-y-6">
             <div class="glass-card p-12 text-center relative overflow-hidden shadow-2xl">
-                <p class="text-[10px] text-blue-900 uppercase font-black tracking-[0.2em] mb-4">Kumulierter Kontostand</p>
-                <h2 id="total-val" class="text-5xl font-black text-white tracking-tighter italic">0,00 €</h2>
+                <p class="text-[10px] text-blue-900 uppercase font-black tracking-[0.2em] mb-4 text-center">Live-Cloud-Gesamtumsatz</p>
+                <h2 id="total-val" class="text-5xl font-black text-white tracking-tighter italic text-center transition-all duration-300">0,00 €</h2>
                 <div class="h-1.5 w-16 bg-blue-700 mx-auto mt-6 rounded-full shadow-[0_0_15px_#1d4ed8]"></div>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-2 gap-4 text-center">
                 <div class="bg-blue-950/30 p-6 rounded-[2.5rem] border border-blue-900/20 text-center">
-                    <p class="text-[9px] text-blue-800 uppercase font-black mb-1">Eigene Leistung</p>
+                    <p class="text-[9px] text-blue-800 uppercase font-black mb-1">Eigenumsatz</p>
                     <p id="v-own" class="text-xl font-black text-emerald-500 leading-none">0 €</p>
                 </div>
                 <div class="bg-blue-950/30 p-6 rounded-[2.5rem] border border-blue-900/20 text-center">
@@ -148,26 +158,28 @@
             </div>
 
             <div class="space-y-3">
-                <h3 class="text-[10px] font-black text-blue-950 uppercase tracking-widest ml-1">Echtzeit Journal</h3>
+                <h3 class="text-[10px] font-black text-blue-950 uppercase tracking-widest ml-1 flex items-center gap-2 text-left">
+                    <span class="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></span> Echtzeit Journal
+                </h3>
                 <div id="journal" class="space-y-2"></div>
             </div>
         </section>
 
-        <!-- JOBS -->
+        <!-- AUFTRÄGE -->
         <section id="page-find" class="hidden space-y-4">
-            <div class="glass-card p-8">
-                <h3 class="font-black text-center mb-6 uppercase text-[10px] tracking-[0.3em] text-blue-600 italic">Auftrag Erfassen</h3>
-                <div class="space-y-4">
-                    <input type="text" id="in-name" placeholder="Kunde (z.B. Müller, Hannover)">
+            <div class="glass-card p-8 text-center">
+                <h3 class="font-black mb-6 uppercase text-[10px] tracking-[0.3em] text-blue-600 italic">Auftrag Buchen</h3>
+                <div class="space-y-4 text-left">
+                    <input type="text" id="in-name" placeholder="Kunde / Projektname">
                     <input type="text" id="in-addr" placeholder="Straße / Ortsteil">
                     <div class="grid grid-cols-2 gap-3">
                         <input type="number" id="in-price" placeholder="Preis (€)">
                         <select id="in-type">
                             <option value="own">Selbst erledigt</option>
-                            <option value="prov">Via Partner (30%)</option>
+                            <option value="prov">Netzwerk (30%)</option>
                         </select>
                     </div>
-                    <button onclick="saveJob()" class="w-full bg-blue-700 py-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all">Sicher Buchen</button>
+                    <button onclick="saveJob()" class="w-full bg-blue-700 py-5 rounded-2xl font-black uppercase text-xs tracking-widest active:scale-95 transition-all mt-2 shadow-xl">Sicher Buchen</button>
                 </div>
             </div>
             <div id="job-list" class="space-y-3 pb-10"></div>
@@ -176,11 +188,11 @@
         <!-- TEAM -->
         <section id="page-team" class="hidden space-y-4">
             <div class="glass-card p-8 text-center">
-                <h3 class="font-black mb-6 uppercase text-[10px] tracking-widest text-blue-600 italic leading-none">Partner Netzwerk</h3>
-                <div class="space-y-4">
+                <h3 class="font-black mb-6 uppercase text-[10px] tracking-widest text-blue-600 italic leading-none text-center">Partner Netzwerk</h3>
+                <div class="space-y-4 text-left">
                     <input type="text" id="p-name" placeholder="Name der Firma">
                     <input type="tel" id="p-tel" placeholder="Telefonnummer">
-                    <button onclick="savePartner()" class="w-full bg-blue-700 py-5 rounded-2xl font-black text-xs uppercase shadow-xl tracking-widest">Hinzufügen</button>
+                    <button onclick="savePartner()" class="w-full bg-blue-700 py-5 rounded-2xl font-black text-xs uppercase shadow-xl tracking-widest active:scale-95 transition-all mt-2">Hinzufügen</button>
                 </div>
             </div>
             <div id="partner-list" class="space-y-3 pb-10 pt-6"></div>
@@ -188,24 +200,24 @@
 
         <!-- SETUP -->
         <section id="page-profile" class="hidden space-y-6">
-            <div class="glass-card p-10">
-                <h3 class="font-black mb-8 uppercase text-[10px] text-blue-600 tracking-[0.2em] text-center border-b border-blue-900/20 pb-4 italic text-white">Gewerbe-Daten</h3>
+            <div class="glass-card p-10 text-center">
+                <h3 class="font-black mb-8 uppercase text-[10px] text-blue-600 tracking-[0.2em] text-center border-b border-blue-900/20 pb-4 italic text-white text-center">Gewerbe-Identität</h3>
                 <div class="space-y-5 text-sm">
-                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3">
+                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3 text-left">
                         <span class="text-blue-900 font-black uppercase text-[9px]">Inhaber</span>
-                        <span class="font-bold text-white uppercase italic">Kjani Zharki</span>
+                        <span class="font-bold text-white uppercase italic tracking-tighter">Kjani Zharki</span>
                     </div>
-                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3">
+                    <div class="flex flex-col gap-1 border-b border-blue-900/10 pb-3 text-left">
                         <span class="text-blue-900 font-black uppercase text-[9px]">Steuernummer</span>
                         <span class="font-bold text-white">25/150/05319</span>
                     </div>
-                    <div class="flex flex-col gap-1">
+                    <div class="flex flex-col gap-1 text-left">
                         <span class="text-blue-900 font-black uppercase text-[9px]">Anschrift</span>
-                        <span class="font-bold text-white leading-tight">Weizenfelder Str. 1<br>30419 Hannover</span>
+                        <span class="font-bold text-white leading-tight text-left">Weizenfelder Str. 1<br>30419 Hannover</span>
                     </div>
                 </div>
             </div>
-            <p class="text-[8px] text-center text-blue-950 font-black uppercase tracking-[0.5em] mt-10">Kjanis Cleaning HQ v1.0</p>
+            <p class="text-[8px] text-center text-blue-950 font-black uppercase tracking-[0.5em] mt-10 text-center">© KJANIS CLEANING HQ v1.0 | Cloud-Active</p>
         </section>
 
     </div>
@@ -218,47 +230,51 @@
         <button onclick="nav('profile')" id="n-profile" class="nav-btn"><span>📋</span><span>Setup</span></button>
     </nav>
 
+    <!-- FIREBASE INTEGRATION -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // ======================================================
-        // ERSETZE DIESE WERTE MIT DEINEN DATEN AUS FIREBASE:
-        // ======================================================
-        const config = {
-          apiKey: "DEIN_API_KEY",
-          authDomain: "DEIN_PROJEKT.firebaseapp.com",
-          projectId: "DEIN_PROJEKT_ID",
-          storageBucket: "DEIN_PROJEKT.appspot.com",
-          messagingSenderId: "DEINE_ID",
-          appId: "DEINE_APP_ID"
+        // --- DEINE ECHTEN KEYS AUS DEM SCREENSHOT ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyCs9tX498OaT9lO1i1tXp_6k-g3uS2XqE",
+          authDomain: "kjani-6a706.firebaseapp.com",
+          projectId: "kjani-6a706",
+          storageBucket: "kjani-6a706.appspot.com",
+          messagingSenderId: "62503034041",
+          appId: "1:62503034041:web:8e1697660c1d2e2b3f46a5"
         };
-        // ======================================================
         
-        // Setup Warnungs-Logik
-        if (config.apiKey === "DEIN_API_KEY") {
-            document.getElementById('setup-warning').classList.remove('hidden');
-        }
-
-        const firebaseConfig = (config.apiKey !== "DEIN_API_KEY") ? config : JSON.parse(__firebase_config || "{}");
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-master-hq';
+        const appId = 'kjani-master-final';
 
         let user = null;
         let stats = { own: 0, prov: 0, logs: [], partners: [] };
         let privacy = false;
 
-        onAuthStateChanged(auth, u => { if(u) { user = u; init(); } else signInAnonymously(auth); });
+        onAuthStateChanged(auth, u => { 
+            if(u) { 
+                user = u; 
+                init(); 
+            } else {
+                signInAnonymously(auth);
+            }
+        });
 
         function init() {
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
             onSnapshot(docRef, snap => {
                 stats = snap.exists() ? snap.data() : { own:0, prov:0, logs:[], partners:[] };
                 render();
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('setup-warning').classList.add('hidden');
+            }, (err) => {
+                console.error("Cloud Error:", err);
             });
+
             const jobsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
             onSnapshot(jobsRef, snap => {
                 const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
@@ -269,35 +285,53 @@
 
         async function syncTotals(list) {
             let o = 0, p = 0;
-            list.forEach(j => { if(j.type === 'own') o += Number(j.val); else p += Number(j.val)*0.3; });
+            list.forEach(j => { 
+                if(j.type === 'own') o += Number(j.val); 
+                else p += (Number(j.val) * 0.3); 
+            });
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main');
             await setDoc(docRef, { ...stats, own:o, prov:p }, { merge: true });
         }
 
         function render() {
-            const total = (stats.own||0) + (stats.prov||0);
+            const total = (stats.own || 0) + (stats.prov || 0);
             const valEl = document.getElementById('total-val');
             valEl.innerText = privacy ? "••••,•• €" : total.toLocaleString('de-DE', {minimumFractionDigits:2}) + " €";
+            
             if(privacy) valEl.classList.add('privacy-blur'); else valEl.classList.remove('privacy-blur');
-            document.getElementById('v-own').innerText = privacy ? "••• €" : (stats.own||0).toLocaleString('de-DE') + " €";
-            document.getElementById('v-prov').innerText = privacy ? "••• €" : (stats.prov||0).toLocaleString('de-DE') + " €";
-            document.getElementById('journal').innerHTML = (stats.logs||[]).slice(-3).reverse().map(l => `<div class="bg-blue-950/20 p-4 rounded-2xl border border-blue-900/30 text-[9px] font-bold text-blue-800 animate-in fade-in">⚡ ${l}</div>`).join('');
-            document.getElementById('partner-list').innerHTML = (stats.partners||[]).map(p => `<div class="glass-card !rounded-2xl p-5 flex justify-between items-center"><div class="text-left"><p class="font-black text-[13px] uppercase italic text-white">${p.name}</p><p class="text-[10px] text-blue-900 font-bold">${p.tel}</p></div></div>`).join('');
+            
+            document.getElementById('v-own').innerText = privacy ? "••• €" : (stats.own || 0).toLocaleString('de-DE') + " €";
+            document.getElementById('v-prov').innerText = privacy ? "••• €" : (stats.prov || 0).toLocaleString('de-DE') + " €";
+            
+            document.getElementById('journal').innerHTML = (stats.logs || []).slice(-3).reverse().map(l => 
+                `<div class="bg-blue-950/20 p-4 rounded-2xl border border-blue-900/30 text-[9px] font-bold text-blue-800 text-center">⚡ ${l}</div>`
+            ).join('');
+
+            document.getElementById('partner-list').innerHTML = (stats.partners || []).map(p => 
+                `<div class="glass-card !rounded-2xl p-5 flex justify-between items-center"><div class="text-left"><p class="font-black text-[13px] uppercase italic text-white text-left">${p.name}</p><p class="text-[10px] text-blue-900 font-bold text-left">${p.tel}</p></div></div>`
+            ).join('');
         }
 
         function renderJobs(jobs) {
             const list = document.getElementById('job-list');
-            if(jobs.length === 0) { list.innerHTML = '<p class="text-center text-slate-800 text-[10px] py-16 italic font-bold uppercase tracking-widest text-center">Cloud Ledger ist leer</p>'; return; }
+            if(jobs.length === 0) { 
+                list.innerHTML = '<p class="text-center text-slate-800 text-[10px] py-16 italic font-bold uppercase tracking-widest text-center">Warte auf Cloud-Daten...</p>'; 
+                return; 
+            }
             list.innerHTML = jobs.reverse().map(j => `
                 <div class="job-item flex justify-between items-center">
-                    <div><p class="font-black text-sm text-white uppercase italic leading-none">${j.name}</p><p class="text-[9px] text-blue-900 font-bold mt-2 uppercase tracking-widest">${j.addr}</p></div>
-                    <div class="text-right"><p class="text-emerald-500 font-black text-base italic">${j.val}€</p><button onclick="window.delJob('${j.id}')" class="text-[8px] text-red-900 font-black uppercase mt-2 tracking-widest">Löschen</button></div>
+                    <div class="text-left text-left"><p class="font-black text-sm text-white uppercase italic leading-none text-left">${j.name}</p><p class="text-[9px] text-blue-900 font-bold mt-2 uppercase tracking-widest leading-none text-left">${j.addr}</p></div>
+                    <div class="text-right"><p class="text-emerald-500 font-black text-base italic leading-none text-right">${j.val}€</p><button onclick="window.delJob('${j.id}')" class="text-[8px] text-red-900 font-black uppercase mt-2 tracking-widest border border-red-900/20 px-2 py-1 rounded">Löschen</button></div>
                 </div>`).join('');
         }
 
         window.nav = id => {
-            ['dash', 'find', 'team', 'profile'].forEach(p => { document.getElementById('page-'+p).classList.add('hidden'); document.getElementById('n-'+p).classList.remove('active'); });
-            document.getElementById('page-'+id).classList.remove('hidden'); document.getElementById('n-'+id).classList.add('active');
+            ['dash', 'find', 'team', 'profile'].forEach(p => { 
+                document.getElementById('page-'+p).classList.add('hidden'); 
+                document.getElementById('n-'+p).classList.remove('active'); 
+            });
+            document.getElementById('page-'+id).classList.remove('hidden'); 
+            document.getElementById('n-'+id).classList.add('active');
         };
 
         window.togglePrivacy = () => {
@@ -309,7 +343,10 @@
         };
 
         window.saveJob = async () => {
-            const n = document.getElementById('in-name').value, a = document.getElementById('in-addr').value, v = document.getElementById('in-price').value, t = document.getElementById('in-type').value;
+            const n = document.getElementById('in-name').value, 
+                  a = document.getElementById('in-addr').value, 
+                  v = document.getElementById('in-price').value, 
+                  t = document.getElementById('in-type').value;
             if(!n || !v) return;
             const ref = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
             await setDoc(doc(ref), { name:n, addr:a, val:Number(v), type:t, date: new Date().toISOString() });
@@ -318,13 +355,16 @@
         };
 
         window.savePartner = async () => {
-            const n = document.getElementById('p-name').value, t = document.getElementById('p-tel').value;
+            const n = document.getElementById('p-name').value, 
+                  t = document.getElementById('p-tel').value;
             if(!n) return;
             await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'dashboard', 'main'), { partners: arrayUnion({name:n, tel:t}) });
             document.getElementById('p-name').value=''; document.getElementById('p-tel').value='';
         };
 
-        window.delJob = async id => { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', id)); };
+        window.delJob = async id => { 
+            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', id)); 
+        };
     </script>
 </body>
 </html>
