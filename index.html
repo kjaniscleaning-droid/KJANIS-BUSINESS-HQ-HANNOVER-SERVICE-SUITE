@@ -1,396 +1,477 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Kjanis Business HQ | Master Edition V11</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  updateDoc, 
+  collection,
+  arrayUnion,
+  deleteDoc
+} from 'firebase/firestore';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  LayoutDashboard, 
+  Radar, 
+  PlusCircle, 
+  Phone, 
+  Trash2, 
+  ShieldCheck, 
+  Eye, 
+  EyeOff, 
+  Zap, 
+  TrendingUp, 
+  MapPin,
+  CheckCircle2,
+  Loader2,
+  Info
+} from 'lucide-react';
+
+// --- Firebase Konfiguration ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjani-master-suite-final';
+
+const App = () => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('dash');
+  const [privacyMode, setPrivacyMode] = useState(false);
+  const [stats, setStats] = useState({ own: 0, prov: 0, logs: [] });
+  const [jobs, setJobs] = useState([]);
+  const [radarResults, setRadarResults] = useState([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [notification, setNotification] = useState(null);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    loc: '',
+    val: '',
+    phone: '',
+    type: 'own'
+  });
+
+  // --- Authentifizierung ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Auth Error:", error);
+      }
+    };
+    initAuth();
+
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- Echtzeit Cloud-Synchronisation ---
+  useEffect(() => {
+    if (!user) return;
+
+    const statsDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'dash', 'main');
+    const jobsCol = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
+
+    // Sync Stats
+    const unsubStats = onSnapshot(statsDoc, (snap) => {
+      if (snap.exists()) setStats(snap.data());
+      setLoading(false);
+    }, (err) => setLoading(false));
+
+    // Sync Jobs
+    const unsubJobs = onSnapshot(jobsCol, (snap) => {
+      const jobList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setJobs(jobList);
+      updateTotals(jobList);
+    });
+
+    return () => { unsubStats(); unsubJobs(); };
+  }, [user]);
+
+  // --- Logik Funktionen ---
+  const notify = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const updateTotals = async (list) => {
+    let o = 0, p = 0;
+    list.forEach(j => {
+      if (j.type === 'own') o += Number(j.val);
+      else p += (Number(j.val) * 0.30);
+    });
+    const statsDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'dash', 'main');
+    await setDoc(statsDoc, { ...stats, own: o, prov: p }, { merge: true });
+  };
+
+  const saveJob = async () => {
+    if (!formData.name || !formData.val) {
+      notify("⚠️ Bitte Name und Betrag eingeben!");
+      return;
+    }
+    try {
+      const jobsCol = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
+      const statsDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'dash', 'main');
+      
+      await setDoc(doc(jobsCol), {
+        ...formData,
+        val: Number(formData.val),
+        date: new Date().toISOString()
+      });
+
+      await updateDoc(statsDoc, {
+        logs: arrayUnion(`Cloud-Safe: ${formData.name} (${formData.val}€)`)
+      });
+
+      notify("✅ Erfolgreich in Cloud gesichert!");
+      setFormData({ name: '', loc: '', val: '', phone: '', type: 'own' });
+      setActiveTab('dash');
+    } catch (e) {
+      notify("❌ Cloud-Fehler: Rules prüfen!");
+    }
+  };
+
+  const deleteJob = async (id) => {
+    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', id));
+    notify("🗑️ Auftrag gelöscht");
+  };
+
+  const scanForJobs = () => {
+    setIsScanning(true);
+    setRadarResults([]);
+    setTimeout(() => {
+      const fakeResults = [
+        { name: "Hausflur-Reinigung", loc: "Hannover-List", val: 680, phone: "0176-4523xx" },
+        { name: "Gartenpflege Büro", loc: "Nordstadt", val: 1100, phone: "0511-8892xx" },
+        { name: "Fensterreinigung", loc: "Linden-Mitte", val: 450, phone: "0152-7731xx" },
+        { name: "Baustellen-Service", loc: "Bothfeld", val: 2400, phone: "0160-9911xx" }
+      ];
+      setRadarResults(fakeResults);
+      setIsScanning(false);
+    }, 2500);
+  };
+
+  const bookFromRadar = (item) => {
+    setFormData({ ...formData, name: item.name, loc: item.loc, val: item.val, phone: item.phone });
+    setActiveTab('jobs');
+  };
+
+  // --- UI Komponenten ---
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin mb-6" />
+        <h2 className="text-white font-black uppercase tracking-[0.3em] text-xs">Kjanis HQ Cloud-Sync</h2>
+        <p className="text-slate-500 text-[10px] mt-2 italic uppercase">Stelle Verbindung zur Master-Zentrale her...</p>
+        <button onClick={() => setLoading(false)} className="mt-12 text-slate-700 text-[9px] uppercase font-bold border border-slate-800 px-6 py-2 rounded-full">Manuell starten</button>
+      </div>
+    );
+  }
+
+  const formatCurrency = (val) => {
+    if (privacyMode) return "••••,•• €";
+    return (val || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-32">
+      {/* Toast Notification */}
+      {notification && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 text-white px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <CheckCircle2 size={18} />
+          <span className="text-[10px] font-black uppercase tracking-widest">{notification}</span>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="p-6 pt-10 flex justify-between items-center max-w-md mx-auto">
+        <div className="text-left">
+          <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none">
+            KJANIS <span className="text-blue-500">HQ</span>
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_#10b981]" />
+            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Cloud Live Engine</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => setPrivacyMode(!privacyMode)}
+          className="w-12 h-12 bg-slate-900 rounded-3xl flex items-center justify-center border border-slate-800 shadow-xl active:scale-90 transition-transform"
+        >
+          {privacyMode ? <EyeOff size={20} className="text-blue-500" /> : <Eye size={20} className="text-slate-400" />}
+        </button>
+      </header>
+
+      <main className="max-w-md mx-auto px-6 space-y-8">
         
-        :root {
-            --dark: #020617;
-            --blue: #2563eb;
-            --emerald: #10b981;
-            --card-bg: rgba(15, 23, 42, 0.92);
-        }
-
-        body {
-            background-color: var(--dark);
-            color: #f8fafc;
-            font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            overflow-x: hidden;
-        }
-
-        /*  */
-        .glass-panel {
-            background: var(--card-bg);
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 2.5rem;
-            box-shadow: 0 30px 70px rgba(0,0,0,0.7);
-        }
-
-        .nav-bar {
-            position: fixed;
-            bottom: 24px;
-            left: 20px;
-            right: 20px;
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.8rem;
-            display: flex;
-            justify-content: space-around;
-            padding: 14px;
-            z-index: 1000;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            font-size: 0.65rem;
-            color: #64748b;
-            font-weight: 800;
-            text-transform: uppercase;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-
-        .nav-item.active { 
-            color: #60a5fa; 
-            transform: translateY(-4px); 
-        }
-
-        input, select {
-            background: rgba(30, 41, 59, 0.8) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
-            border-radius: 1.25rem !important;
-            padding: 1.25rem !important;
-            font-size: 16px;
-            width: 100%;
-            outline: none;
-        }
-
-        .job-card {
-            background: rgba(30, 41, 59, 0.4);
-            border-left: 6px solid var(--blue);
-            border-radius: 1.5rem;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            animation: slideUp 0.4s ease-out;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        #loader {
-            position: fixed;
-            inset: 0;
-            background: var(--dark);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .radar-scan {
-            width: 160px;
-            height: 160px;
-            border: 2px solid rgba(37, 99, 235, 0.2);
-            border-radius: 50%;
-            position: relative;
-            overflow: hidden;
-            background: radial-gradient(circle, rgba(37, 99, 235, 0.1) 0%, transparent 70%);
-        }
-
-        .radar-line {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 50%;
-            height: 2px;
-            background: var(--blue);
-            transform-origin: left;
-            animation: rotate 3s linear infinite;
-            box-shadow: 0 0 15px var(--blue);
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .btn-main {
-            background: var(--blue);
-            color: white;
-            padding: 18px;
-            border-radius: 18px;
-            font-weight: 900;
-            text-transform: uppercase;
-            width: 100%;
-            letter-spacing: 0.1em;
-            box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
-            transition: all 0.3s;
-        }
-
-        .btn-main:active { transform: scale(0.95); opacity: 0.8; }
-
-        #toast {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            right: 20px;
-            background: var(--emerald);
-            color: white;
-            padding: 15px;
-            border-radius: 15px;
-            text-align: center;
-            font-weight: 900;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            z-index: 10001;
-            transform: translateY(-150%);
-            transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 15px 30px rgba(16, 185, 129, 0.4);
-        }
-        #toast.show { transform: translateY(0); }
-    </style>
-</head>
-<body class="pb-44">
-
-    <!-- Erfolgs-Toast -->
-    <div id="toast">✅ Erfolgreich in Cloud gespeichert!</div>
-
-    <!-- Ladeschirm -->
-    <div id="loader">
-        <div class="w-16 h-16 border-4 border-slate-900 border-t-blue-500 rounded-full animate-spin mb-8"></div>
-        <p class="text-[11px] font-black uppercase tracking-[0.5em] text-slate-500 italic text-center">Cloud-Abgleich Hannover...</p>
-        <button onclick="document.getElementById('loader').style.display='none'" class="mt-12 text-[9px] text-blue-900 font-black border border-blue-900/30 px-6 py-2 rounded-full">System überspringen</button>
-    </div>
-
-    <div class="p-6 max-w-md mx-auto">
-        
-        <header class="flex justify-between items-center mb-10 pt-4">
-            <div class="text-left">
-                <h1 class="text-2xl font-black italic uppercase tracking-tighter text-left">KJANIS <span class="text-blue-500">HQ</span></h1>
-                <p class="text-[8px] text-slate-500 font-bold uppercase tracking-widest text-left">Gewerbe-Cloud Intelligence</p>
-            </div>
-            <button onclick="togglePrivacy()" class="w-12 h-12 glass-panel flex items-center justify-center text-xl shadow-2xl active:scale-90">🔒</button>
-        </header>
-
-        <!-- DASHBOARD -->
-        <section id="p-dash" class="space-y-6">
-            <div class="glass-panel p-12 text-center relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-emerald-500"></div>
-                <p class="text-[10px] text-slate-400 uppercase font-black tracking-[0.3em] mb-3 text-center">Live Gesamtumsatz</p>
-                <h2 id="ui-total" class="text-6xl font-black italic tracking-tighter text-center">0,00 €</h2>
-                <div class="mt-4 flex justify-center gap-2">
-                    <span class="bg-blue-500/10 text-blue-500 text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest">Master-Zertifiziert</span>
+        {/* DASHBOARD TAB */}
+        {activeTab === 'dash' && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Main Stats Card */}
+            <div className="relative p-10 rounded-[2.5rem] bg-slate-900 border border-slate-800 overflow-hidden shadow-2xl">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-emerald-500" />
+              <div className="text-center relative z-10">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Umsatz Gesamt (Brutto)</p>
+                <h2 className="text-6xl font-black italic tracking-tighter mb-4 text-white">
+                  {formatCurrency((stats.own || 0) + (stats.prov || 0))}
+                </h2>
+                <div className="inline-flex items-center gap-2 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                  <ShieldCheck size={10} className="text-blue-400" />
+                  <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Master Cloud Sync</span>
                 </div>
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <div class="glass-panel p-6 text-center">
-                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Eigene Arbeit</p>
-                    <p id="ui-own" class="text-xl font-black text-emerald-400">0 €</p>
-                </div>
-                <div class="glass-panel p-6 text-center">
-                    <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Provision (30%)</p>
-                    <p id="ui-prov" class="text-xl font-black text-blue-400">0 €</p>
-                </div>
+              </div>
+              <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-600/10 blur-3xl rounded-full" />
             </div>
 
-            <div class="space-y-3">
-                <p class="text-[9px] text-slate-700 font-black uppercase ml-2 tracking-widest text-left text-left">Aktivitäts-Journal</p>
-                <div id="log-container" class="space-y-2"></div>
+            {/* Sub Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <StatBox label="Eigene Arbeit" value={formatCurrency(stats.own)} color="emerald" icon={<TrendingUp size={14} />} />
+              <StatBox label="Provision (30%)" value={formatCurrency(stats.prov)} color="blue" icon={<Zap size={14} />} />
             </div>
-        </section>
 
-        <!-- KI RADAR -->
-        <section id="p-radar" class="hidden space-y-6">
-            <div class="glass-panel p-10 flex flex-col items-center text-center">
-                <h3 class="font-black mb-6 uppercase text-blue-500 italic tracking-widest">Auftrags-Radar</h3>
-                <div class="radar-scan mb-8">
-                    <div class="radar-line"></div>
-                </div>
-                <button onclick="scanForJobs()" id="scan-btn" class="btn-main italic">Markt-Scan Hannover</button>
-            </div>
-            
-            <div id="radar-results" class="space-y-3 pb-24 text-center">
-                <p class="text-center py-10 opacity-20 text-[10px] font-black uppercase text-center">Starte den Scan für echte Aufträge...</p>
-            </div>
-        </section>
-
-        <!-- AUFTRÄGE -->
-        <section id="p-jobs" class="hidden space-y-4">
-            <div class="glass-panel p-8 text-center text-center">
-                <h3 class="font-black mb-6 uppercase text-blue-500 italic tracking-widest text-center">Auftrag Buchen</h3>
-                <div class="space-y-4 text-left">
-                    <input type="text" id="in-name" placeholder="Kunde / Projektname">
-                    <input type="text" id="in-loc" placeholder="Standort (z.B. List, Linden)">
-                    <input type="text" id="in-phone" placeholder="Telefonnummer (für Rückfragen)">
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="number" id="in-val" placeholder="Summe (€)">
-                        <select id="in-type">
-                            <option value="own">Eigenleistung</option>
-                            <option value="prov">Partner (30%)</option>
-                        </select>
+            {/* Log Section */}
+            <div className="space-y-3">
+              <h3 className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2 flex items-center gap-2">
+                <History size={12} /> Cloud Logbuch
+              </h3>
+              <div className="space-y-2">
+                {stats.logs && stats.logs.length > 0 ? (
+                  stats.logs.slice(-3).reverse().map((log, i) => (
+                    <div key={i} className="p-4 bg-slate-900/50 rounded-2xl border border-slate-800/50 text-center text-[9px] font-bold text-slate-400 italic">
+                      ⚡ {log}
                     </div>
-                    <button onclick="saveJob()" class="btn-main mt-4">Cloud-Sicherung</button>
-                </div>
+                  ))
+                ) : (
+                  <p className="text-center py-6 text-slate-700 text-[10px] uppercase font-bold italic tracking-widest">Warte auf Cloud-Events...</p>
+                )}
+              </div>
             </div>
-            <div id="job-list" class="space-y-3 pb-24 text-left"></div>
-        </section>
+          </div>
+        )}
 
-    </div>
+        {/* RADAR TAB */}
+        {activeTab === 'radar' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="p-10 rounded-[3rem] bg-slate-900 border border-slate-800 text-center relative overflow-hidden">
+              <h3 className="text-xl font-black italic uppercase tracking-tighter mb-8 text-blue-500">Job-Radar Hannover</h3>
+              <div className="relative flex justify-center mb-10">
+                <div className={`w-32 h-32 rounded-full border-2 border-blue-500/20 flex items-center justify-center ${isScanning ? 'animate-pulse' : ''}`}>
+                  <Radar className={`text-blue-500 ${isScanning ? 'animate-spin' : ''}`} size={48} />
+                </div>
+                {isScanning && <div className="absolute inset-0 flex items-center justify-center"><div className="w-48 h-48 border border-blue-500/10 rounded-full animate-ping" /></div>}
+              </div>
+              <button 
+                onClick={scanForJobs}
+                disabled={isScanning}
+                className="w-full py-5 bg-blue-600 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-900/40 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {isScanning ? 'Analysiere Markt...' : 'Markt-Scan Starten'}
+              </button>
+            </div>
 
-    <!-- NAVBAR -->
-    <nav class="nav-bar shadow-2xl">
-        <button onclick="nav('dash', this)" class="nav-item active">
-            <span class="text-xl mb-1">📊</span><span>Stats</span>
-        </button>
-        <button onclick="nav('radar', this)" class="nav-item">
-            <span class="text-xl mb-1">📡</span><span>Radar</span>
-        </button>
-        <button onclick="nav('jobs', this)" class="nav-item">
-            <span class="text-lg mb-1">➕</span><span>Buchen</span>
-        </button>
-    </nav>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, arrayUnion, collection, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyCs9tX498OaT9lO1i1tXp_6k-g3uS2XqE",
-            authDomain: "kjani-6a706.firebaseapp.com",
-            projectId: "kjani-6a706",
-            storageBucket: "kjani-6a706.appspot.com",
-            messagingSenderId: "62503034041",
-            appId: "1:62503034041:web:8e1697660c1d2e2b3f46a5"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appKey = 'kjani-master-final-v11';
-
-        let userId = null;
-        let stats = { own: 0, prov: 0, logs: [] };
-        let privacy = false;
-
-        // Auto-Loader-Stop
-        setTimeout(() => { document.getElementById('loader').style.display = 'none'; }, 4000);
-
-        onAuthStateChanged(auth, user => {
-            if(user) { userId = user.uid; startSync(); } 
-            else signInAnonymously(auth);
-        });
-
-        function startSync() {
-            onSnapshot(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), snap => {
-                stats = snap.exists() ? snap.data() : { own: 0, prov: 0, logs: [] };
-                renderUI();
-                document.getElementById('loader').style.display = 'none';
-            }, () => { document.getElementById('loader').style.display = 'none'; });
-
-            onSnapshot(collection(db, 'artifacts', appKey, 'users', userId, 'jobs'), snap => {
-                const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                renderJobs(list);
-                calculateTotals(list);
-            });
-        }
-
-        async function calculateTotals(list) {
-            let o = 0, p = 0;
-            list.forEach(j => { if(j.type === 'own') o += Number(j.val); else p += (Number(j.val) * 0.3); });
-            await setDoc(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), { ...stats, own: o, prov: p }, { merge: true });
-        }
-
-        function renderUI() {
-            const total = (stats.own || 0) + (stats.prov || 0);
-            document.getElementById('ui-total').innerText = privacy ? "••••,•• €" : total.toLocaleString('de-DE', {minimumFractionDigits: 2}) + " €";
-            document.getElementById('ui-own').innerText = privacy ? "••• €" : (stats.own || 0).toLocaleString('de-DE') + " €";
-            document.getElementById('ui-prov').innerText = privacy ? "••• €" : (stats.prov || 0).toLocaleString('de-DE') + " €";
-            document.getElementById('log-container').innerHTML = (stats.logs || []).slice(-3).reverse().map(l => `<div class="glass-panel p-4 text-[9px] font-bold text-slate-500 border-none shadow-none text-center">⚡ ${l}</div>`).join('');
-        }
-
-        function renderJobs(jobs) {
-            const container = document.getElementById('job-list');
-            if(jobs.length === 0) { container.innerHTML = '<p class="text-center py-24 opacity-20 text-[10px] font-black uppercase text-center text-center">Keine Buchungen in Cloud</p>'; return; }
-            container.innerHTML = jobs.reverse().map(j => `
-                <div class="job-card flex justify-between items-center">
-                    <div class="text-left"><p class="font-bold text-sm text-left">${j.name}</p><p class="text-[9px] opacity-40 uppercase font-black text-left">${j.loc || 'Hannover'}</p><p class="text-[9px] text-blue-500 font-bold text-left">${j.phone || 'Keine Nummer'}</p></div>
-                    <div class="text-right"><p class="text-emerald-500 font-bold text-lg text-right">${j.val}€</p><button onclick="window.delJob('${j.id}')" class="text-[8px] text-red-500/50 uppercase font-black mt-1 text-right">Löschen</button></div>
-                </div>`).join('');
-        }
-
-        window.showToast = () => {
-            const t = document.getElementById('toast');
-            t.classList.add('show');
-            setTimeout(() => { t.classList.remove('show'); }, 3000);
-        };
-
-        window.scanForJobs = () => {
-            const btn = document.getElementById('scan-btn');
-            btn.innerText = "Scanner läuft...";
-            btn.disabled = true;
-            setTimeout(() => {
-                const results = [
-                    { name: "Hausflur-Reinigung", loc: "Hannover-List", val: 680, phone: "+49 176 4523xx" },
-                    { name: "Gartenpflege Firma", loc: "Nordstadt", val: 1100, phone: "+49 511 8892xx" },
-                    { name: "Fensterreinigung Büro", loc: "Linden-Mitte", val: 450, phone: "+49 152 7731xx" },
-                    { name: "Treppenhaus-Service", loc: "Vahrenwald", val: 320, phone: "+49 160 9942xx" }
-                ];
-                document.getElementById('radar-results').innerHTML = '<p class="text-[9px] font-black text-blue-500 mb-4 uppercase ml-1">Auftrags-Potenziale gefunden:</p>' + 
-                results.map(r => `
-                    <div class="job-card border-l-emerald-600 flex justify-between items-center bg-emerald-950/10">
-                        <div class="text-left text-left"><p class="font-bold text-sm text-left text-left">${r.name}</p><p class="text-[9px] opacity-40 text-left text-left">${r.loc}</p><a href="tel:${r.phone}" class="text-[10px] text-blue-400 font-black text-left">📞 ${r.phone}</a></div>
-                        <button onclick="window.bookFromRadar('${r.name}', '${r.loc}', ${r.val}, '${r.phone}')" class="bg-blue-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter shadow-lg active:scale-90">Sichern</button>
+            <div className="space-y-4">
+              {radarResults.length > 0 ? (
+                radarResults.map((item, i) => (
+                  <div key={i} className="p-6 rounded-[2rem] bg-slate-900 border border-slate-800 flex justify-between items-center group hover:border-blue-500/50 transition-colors">
+                    <div className="text-left">
+                      <p className="font-black text-sm text-white group-hover:text-blue-400 transition-colors text-left">{item.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <MapPin size={10} className="text-slate-500" />
+                        <p className="text-[10px] text-slate-500 font-bold uppercase text-left">{item.loc}</p>
+                      </div>
+                      <p className="text-[10px] text-blue-500 font-black mt-2 text-left flex items-center gap-1"><Phone size={10}/> {item.phone}</p>
                     </div>
-                `).join('');
-                btn.innerText = "Markt-Scan Hannover";
-                btn.disabled = false;
-            }, 2000);
-        };
+                    <button 
+                      onClick={() => bookFromRadar(item)}
+                      className="bg-blue-600 px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-tighter shadow-lg active:scale-90"
+                    >
+                      Sichern
+                    </button>
+                  </div>
+                ))
+              ) : !isScanning && (
+                <p className="text-center py-20 opacity-20 text-[10px] font-black uppercase tracking-widest">Keine Scans im Speicher</p>
+              )}
+            </div>
+          </div>
+        )}
 
-        window.bookFromRadar = (name, loc, val, phone) => {
-            document.getElementById('in-name').value = name;
-            document.getElementById('in-loc').value = loc;
-            document.getElementById('in-val').value = val;
-            document.getElementById('in-phone').value = phone;
-            window.nav('jobs', document.querySelectorAll('.nav-item')[2]);
-        };
+        {/* JOBS TAB (Buchung) */}
+        {activeTab === 'jobs' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="p-10 rounded-[3rem] bg-slate-900 border border-slate-800 shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full" />
+               <h3 className="text-xl font-black italic uppercase tracking-tighter mb-8 text-emerald-400 text-center">Auftrag Buchen</h3>
+               <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-4 tracking-widest">Kunde / Projekt</label>
+                    <input 
+                      type="text" 
+                      placeholder="z.B. Schmidt, Hannover"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="text-left"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-4 tracking-widest">Standort</label>
+                    <input 
+                      type="text" 
+                      placeholder="z.B. Nordstadt"
+                      value={formData.loc}
+                      onChange={(e) => setFormData({...formData, loc: e.target.value})}
+                      className="text-left"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black uppercase text-slate-500 ml-4 tracking-widest">Telefon</label>
+                    <input 
+                      type="text" 
+                      placeholder="z.B. 0176-..."
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      className="text-left"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black uppercase text-slate-500 ml-4 tracking-widest">Brutto-Summe (€)</label>
+                      <input 
+                        type="number" 
+                        placeholder="0.00"
+                        value={formData.val}
+                        onChange={(e) => setFormData({...formData, val: e.target.value})}
+                        className="text-left"
+                      />
+                    </div>
+                    <div className="space-y-1 text-left">
+                      <label className="text-[8px] font-black uppercase text-slate-500 ml-4 tracking-widest text-left">Typ</label>
+                      <select 
+                        value={formData.type}
+                        onChange={(e) => setFormData({...formData, type: e.target.value})}
+                        className="text-left"
+                      >
+                        <option value="own">Eigene Arbeit</option>
+                        <option value="prov">Partner (30%)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={saveJob}
+                    className="w-full py-5 bg-emerald-600 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-900/40 mt-6 active:scale-95 transition-all italic"
+                  >
+                    Buchen & Cloud-Sichern
+                  </button>
+               </div>
+            </div>
 
-        window.nav = (id, el) => {
-            ['p-dash', 'p-radar', 'p-jobs'].forEach(s => document.getElementById(s).classList.add('hidden'));
-            document.getElementById('p-'+id).classList.remove('hidden');
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            if(el) el.classList.add('active');
-        };
+            {/* List of current jobs */}
+            <div className="space-y-4">
+              <h3 className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-2 flex items-center gap-2">
+                <LayoutDashboard size={12} /> Cloud Speicherinhalt
+              </h3>
+              {jobs.length > 0 ? (
+                jobs.slice().reverse().map((j) => (
+                  <div key={j.id} className="p-6 rounded-[2rem] bg-slate-900/50 border border-slate-800 flex justify-between items-center group">
+                    <div className="text-left">
+                      <p className="font-black text-sm text-white group-hover:text-blue-400 transition-colors text-left">{j.name}</p>
+                      <p className="text-[9px] text-slate-500 font-bold uppercase text-left">{j.loc || 'Hannover'}</p>
+                      <p className="text-[9px] text-blue-500/60 font-black text-left">{j.phone || '-'}</p>
+                    </div>
+                    <div className="text-right flex flex-col items-end">
+                      <p className="text-emerald-500 font-black text-lg tracking-tighter text-right">{Number(j.val).toLocaleString('de-DE')} €</p>
+                      <button 
+                        onClick={() => deleteJob(j.id)}
+                        className="text-red-500/50 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-center py-20 opacity-20 text-[10px] font-black uppercase tracking-widest">Keine Cloud-Daten</p>
+              )}
+            </div>
+          </div>
+        )}
 
-        window.saveJob = async () => {
-            const n = document.getElementById('in-name').value, l = document.getElementById('in-loc').value, v = document.getElementById('in-val').value, t = document.getElementById('in-type').value, ph = document.getElementById('in-phone').value;
-            if(!n || !v) return;
-            await setDoc(doc(collection(db, 'artifacts', appKey, 'users', userId, 'jobs')), { name:n, loc:l, val:Number(v), type:t, phone:ph, date: new Date().toISOString() });
-            await updateDoc(doc(db, 'artifacts', appKey, 'users', userId, 'dash', 'main'), { logs: arrayUnion(`Cloud-Safe: ${n}`) });
-            window.showToast();
-            ['in-name','in-loc','in-val','in-phone'].forEach(i => document.getElementById(i).value='');
-            setTimeout(() => { window.nav('dash', document.querySelectorAll('.nav-item')[0]); }, 1000);
-        };
+        {/* Footer Info */}
+        <div className="text-center pb-10 pt-4">
+           <div className="inline-flex items-center gap-2 bg-slate-900 px-4 py-2 rounded-2xl border border-slate-800">
+              <ShieldCheck size={12} className="text-emerald-500" />
+              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">ID: {user?.uid.substring(0, 10)}...</span>
+           </div>
+           <p className="text-[7px] text-slate-700 uppercase font-black mt-4 tracking-[0.4em]">Kjanis HQ v12.0 • Final Stability Release</p>
+        </div>
+      </main>
 
-        window.delJob = async id => { await deleteDoc(doc(db, 'artifacts', appKey, 'users', userId, 'jobs', id)); };
-        window.togglePrivacy = () => { privacy = !privacy; renderUI(); };
-    </script>
-</body>
-</html>
+      {/* NAVIGATION BAR */}
+      <nav className="nav-bar shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+        <NavBtn 
+          icon={<LayoutDashboard size={20} />} 
+          label="Dash" 
+          active={activeTab === 'dash'} 
+          onClick={() => setActiveTab('dash')} 
+        />
+        <NavBtn 
+          icon={<Radar size={20} />} 
+          label="Radar" 
+          active={activeTab === 'radar'} 
+          onClick={() => setActiveTab('radar')} 
+        />
+        <NavBtn 
+          icon={<PlusCircle size={22} />} 
+          label="Buchen" 
+          active={activeTab === 'jobs'} 
+          onClick={() => setActiveTab('jobs')} 
+          primary
+        />
+      </nav>
+    </div>
+  );
+};
+
+const StatBox = ({ label, value, color, icon }) => {
+  const colors = {
+    emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    blue: "bg-blue-500/10 text-blue-400 border-blue-500/20"
+  };
+  return (
+    <div className={`p-6 rounded-[2rem] bg-slate-900 border ${colors[color]} text-center relative overflow-hidden group`}>
+      <div className="absolute top-2 right-4 opacity-10 group-hover:scale-125 transition-transform">{icon}</div>
+      <p className="text-[8px] font-black uppercase tracking-widest text-slate-500 mb-2">{label}</p>
+      <p className={`text-xl font-black italic tracking-tighter ${color === 'emerald' ? 'text-emerald-400' : 'text-blue-400'}`}>{value}</p>
+    </div>
+  );
+};
+
+const NavBtn = ({ icon, label, active, onClick, primary }) => (
+  <button 
+    onClick={onClick}
+    className={`nav-item ${active ? 'active' : ''} ${primary ? 'scale-110' : ''}`}
+  >
+    <div className={`mb-1 transition-all ${active ? 'text-blue-500 scale-110' : 'text-slate-600'} ${primary ? 'bg-blue-600/10 p-2 rounded-xl border border-blue-500/20' : ''}`}>
+      {icon}
+    </div>
+    <span className="tracking-widest">{label}</span>
+  </button>
+);
+
+export default App;
