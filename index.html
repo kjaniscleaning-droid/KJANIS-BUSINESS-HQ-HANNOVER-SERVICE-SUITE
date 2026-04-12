@@ -28,8 +28,8 @@ const IconRadar = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="no
 const IconTrash = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>;
 const IconZap = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-400"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
 
-// --- Firebase Platinum Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "demo-mode" };
+// --- Firebase Initialization ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "" };
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -61,7 +61,7 @@ const App = () => {
     return (Number(amount) || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " €";
   };
 
-  // 1. Authentifizierung & Initialer Boot
+  // 1. Authentifizierung & Cloud Boot
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -81,16 +81,16 @@ const App = () => {
     return () => unsub();
   }, []);
 
-  // 2. Echtzeit Cloud-Synchronisation (Firebase)
+  // 2. Echtzeit Cloud-Synchronisation
   useEffect(() => {
     if (!user) return;
 
-    // Synchronisiere Partner-Netzwerk
+    // Partner-Pool abrufen
     const unsubPartners = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'partners'), (snap) => {
       setPartners(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => console.error("Partner Sync Error", err));
 
-    // Synchronisiere Jobs & Berechne Stats
+    // Buchungen abrufen & Stats berechnen
     const unsubJobs = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'jobs'), (snap) => {
       const allJobs = snap.docs.map(d => d.data());
       let o = 0, p = 0;
@@ -105,19 +105,6 @@ const App = () => {
     return () => { unsubPartners(); unsubJobs(); };
   }, [user]);
 
-  // Automation: Zapier Webhook Trigger
-  const triggerAutomation = async (jobData) => {
-    if (!webhookUrl) return;
-    try {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...jobData, source: "Kjanis HQ Platinum" })
-      });
-      console.log("Automation Triggered");
-    } catch (e) { console.error("Webhook Error", e); }
-  };
-
   // Handlers
   const handleSaveJob = async () => {
     if (!user) return;
@@ -131,11 +118,19 @@ const App = () => {
         date: new Date().toISOString()
       };
       await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'jobs'), jobData);
-      if (webhookUrl) triggerAutomation(jobData);
       
+      // Automation Trigger (Webhook)
+      if (webhookUrl) {
+        fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...jobData, status: "platinum_safe" })
+        }).catch(e => console.error(e));
+      }
+
       setFormData({ name: '', val: '', type: 'own', partnerId: '' });
       setActiveTab('dash');
-      notify("✅ Cloud-Save erfolgreich");
+      notify("✅ Buchung in Cloud gesichert");
     } catch (e) { notify("❌ Speicher-Fehler!"); }
   };
 
@@ -179,8 +174,8 @@ const App = () => {
 
   if (loading) return (
     <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-6 text-center">
-      <div className="w-14 h-14 border-4 border-slate-900 border-t-blue-500 rounded-full animate-spin mb-6 shadow-[0_0_20px_#3b82f6]"></div>
-      <h2 className="text-white font-black uppercase tracking-[0.4em] text-[10px]">Platinum Cloud Booting...</h2>
+      <div className="w-14 h-14 border-4 border-slate-900 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+      <h2 className="text-white font-black uppercase tracking-[0.4em] text-[10px]">Cloud Booting...</h2>
     </div>
   );
 
@@ -196,7 +191,7 @@ const App = () => {
       <header className="p-8 max-w-md mx-auto flex justify-between items-center">
         <div className="text-left">
           <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none">KJANIS <span className="text-blue-500 font-black">HQ</span></h1>
-          <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.4em] mt-1 text-left tracking-widest">Platinum Enterprise V16.3</p>
+          <p className="text-[7px] font-black text-slate-500 uppercase tracking-[0.4em] mt-1 text-left tracking-widest">Master Platinum V16.3</p>
         </div>
         <button onClick={() => setPrivacyMode(!privacyMode)} className={`p-4 rounded-2xl border transition-all ${privacyMode ? 'bg-blue-600 border-blue-400 shadow-lg shadow-blue-500/30 scale-110' : 'bg-slate-900 border-white/10'}`}>
           {privacyMode ? '🔒' : '👁️'}
@@ -214,14 +209,14 @@ const App = () => {
               <h2 className="text-5xl font-black italic tracking-tighter leading-none">{formatMoney(stats.own + stats.prov)}</h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-[2.5rem] text-center">
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-[2.5rem]">
                 <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Eigene Arbeit</p>
-                <p className="text-emerald-400 font-black text-lg text-center leading-none">{formatMoney(stats.own)}</p>
+                <p className="text-emerald-400 font-black text-lg leading-none">{formatMoney(stats.own)}</p>
               </div>
-              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-[2.5rem] text-center">
-                <p className="text-[8px] text-slate-500 font-black uppercase mb-1 tracking-tighter text-center">Provisionen</p>
-                <p className="text-blue-400 font-black text-lg text-center leading-none">{formatMoney(stats.prov)}</p>
+              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-[2.5rem]">
+                <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Provisionen</p>
+                <p className="text-blue-400 font-black text-lg leading-none">{formatMoney(stats.prov)}</p>
               </div>
             </div>
 
@@ -229,19 +224,23 @@ const App = () => {
                 📄 Beleg für Finanzamt drucken
             </button>
 
-            {/* Hidden Report für Druck */}
+            {/* Hidden Tax Report */}
             <div className="hidden">
               <div ref={printRef} className="text-black bg-white p-12 font-serif text-left">
                 <h1 className="text-3xl font-bold border-b-4 border-black pb-4 mb-8 uppercase italic tracking-tighter">Finanzbericht - Kjanis HQ</h1>
-                <p className="mb-10 text-sm font-bold uppercase">Status: Cloud-Zertifiziert</p>
+                <p className="mb-10 text-sm font-bold uppercase">Status: Zertifiziert</p>
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b-2 border-black font-bold text-xs uppercase text-left"><th className="py-3 text-left">Typ</th><th className="py-3 text-right">Betrag</th></tr>
+                    <tr className="border-b-2 border-black font-bold text-xs uppercase text-left">
+                      <th className="py-3">Kategorie</th><th className="py-3 text-right">Summe</th>
+                    </tr>
                   </thead>
                   <tbody>
-                    <tr><td className="py-4 text-left">Eigenumsatz (Netto)</td><td className="py-4 text-right font-bold">{(stats.own || 0).toLocaleString('de-DE')} €</td></tr>
+                    <tr><td className="py-4">Eigenleistung (Netto)</td><td className="py-4 text-right font-bold">{(stats.own || 0).toLocaleString('de-DE')} €</td></tr>
                     <tr><td className="py-4 text-left">Partner-Provisionen (Marge)</td><td className="py-4 text-right font-bold">{(stats.prov || 0).toLocaleString('de-DE')} €</td></tr>
-                    <tr className="border-t-4 border-black font-black text-2xl text-left"><td className="py-6 uppercase italic text-left">Gesamtgewinn</td><td className="py-6 text-right">{(stats.own + stats.prov).toLocaleString('de-DE')} €</td></tr>
+                    <tr className="border-t-4 border-black font-black text-2xl text-left">
+                      <td className="py-6 uppercase italic">Gesamtgewinn</td><td className="py-6 text-right">{(stats.own + stats.prov).toLocaleString('de-DE')} €</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -253,15 +252,15 @@ const App = () => {
         {activeTab === 'radar' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-500">
             <div className="p-8 bg-slate-900 border border-white/5 rounded-[3.5rem] space-y-4 shadow-xl text-center">
-              <h3 className="font-black text-blue-500 uppercase italic">KI Markt-Scanner (API)</h3>
-              <input type="text" placeholder="Apify Link (JSON URL)" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-[10px] outline-none text-center focus:border-blue-500" value={jsonLink} onChange={e => setJsonLink(e.target.value)} />
+              <h3 className="font-black text-blue-500 uppercase italic">KI Markt-Scanner</h3>
+              <input type="text" placeholder="Apify Link (JSON URL)" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-[10px] outline-none text-center focus:border-blue-500 transition-all" value={jsonLink} onChange={e => setJsonLink(e.target.value)} />
               <button onClick={importLeads} disabled={isScanning} className="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 text-center italic">
                 {isScanning ? "Scanner läuft..." : "Markt-Scan Starten"}
               </button>
             </div>
             <div className="space-y-3">
               {radarResults.map(lead => (
-                <div key={lead.id} className="p-6 bg-slate-900/50 border border-blue-500/20 rounded-[2.5rem] flex justify-between items-center text-left">
+                <div key={lead.id} className="p-6 bg-slate-900/50 border border-blue-500/20 rounded-[2.5rem] flex justify-between items-center text-left shadow-lg animate-in slide-in-from-bottom">
                   <div>
                     <p className="text-[9px] font-black text-blue-500 uppercase leading-none">{lead.loc}</p>
                     <h4 className="text-sm font-black uppercase mt-1 leading-none">{lead.name}</h4>
@@ -276,7 +275,7 @@ const App = () => {
 
         {/* BUCHUNG */}
         {activeTab === 'plus' && (
-           <div className="p-8 bg-slate-900 rounded-[3.5rem] border border-white/5 space-y-4 shadow-2xl text-center">
+           <div className="p-8 bg-slate-900 rounded-[3.5rem] border border-white/5 space-y-4 shadow-2xl text-center animate-in slide-in-from-bottom">
               <h3 className="font-black text-blue-500 uppercase italic">Buchungssystem</h3>
               <input type="text" placeholder="Kunde / Projekt" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 outline-none text-center focus:border-blue-500" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               <input type="number" placeholder="Betrag €" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 outline-none text-center focus:border-blue-500" value={formData.val} onChange={e => setFormData({...formData, val: e.target.value})} />
@@ -290,7 +289,7 @@ const App = () => {
                   {partners.map(p => <option key={p.id} value={p.id}>{p.name} ({p.provision}%)</option>)}
                 </select>
               )}
-              <input type="text" placeholder="Zapier Webhook (Automation)" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-[8px] outline-none text-center opacity-30 focus:opacity-100" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} />
+              <input type="text" placeholder="Webhook URL (Automation)" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-[8px] outline-none text-center opacity-30 focus:opacity-100" value={webhookUrl} onChange={e => setWebhookUrl(e.target.value)} />
               <button onClick={handleSaveJob} className="w-full bg-blue-600 py-7 rounded-[2.2rem] font-black uppercase text-[11px] shadow-xl active:scale-95 italic text-center">Cloud-Safe speichern</button>
            </div>
         )}
@@ -302,11 +301,11 @@ const App = () => {
               <h3 className="font-black text-emerald-500 uppercase italic">Partner-Pool</h3>
               <input type="text" placeholder="Firmenname" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none focus:border-emerald-500" value={partnerData.name} onChange={e => setPartnerData({...partnerData, name: e.target.value})} />
               <input type="email" placeholder="E-Mail Kontakt" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none focus:border-emerald-500" value={partnerData.email} onChange={e => setPartnerData({...partnerData, email: e.target.value})} />
-              <button onClick={handleAddPartner} className="w-full bg-emerald-600 py-6 rounded-[2rem] font-black uppercase text-[10px] italic shadow-emerald-900/40">Partner registrieren</button>
+              <button onClick={handleAddPartner} className="w-full bg-emerald-600 py-6 rounded-[2rem] font-black uppercase text-[10px] italic shadow-emerald-900/40">Listen</button>
             </div>
             <div className="space-y-3 px-2">
                 {partners.map(p => (
-                   <div key={p.id} className="p-5 bg-slate-900/40 border border-white/5 rounded-[2.5rem] flex justify-between items-center text-left shadow-lg">
+                   <div key={p.id} className="p-5 bg-slate-900/40 border border-white/5 rounded-[2.5rem] flex justify-between items-center text-left shadow-lg animate-in slide-in-from-left">
                       <div className="text-left">
                         <p className="text-[10px] font-black uppercase leading-none">{p.name}</p>
                         <p className="text-[8px] text-slate-500 font-bold leading-none mt-1 tracking-widest">{p.email}</p>
