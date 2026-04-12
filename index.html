@@ -1,31 +1,3 @@
-radar");
-    const [leads, setLeads] = useState([]);
-    const [partners, setPartners] = useState([]);
-    const [isScanning, setIsScanning] = useState(false);
-    const [jobs, setJobs] = useState([]);
-    const [notification, setNotification] = useState(null);
-
-    const notify = (msg) => {
-        setNotification(msg);
-        setTimeout(() => setNotification(null), 3000);
-    };
-
-    // LocalStorage laden
-    useEffect(() => {
-        const savedPartners = localStorage.getItem("kj_partners");
-        const savedJobs = localStorage.getItem("kj_jobs");
-        if (savedPartners) setPartners(JSON.parse(savedPartners));
-        if (savedJobs) setJobs(JSON.parse(savedJobs));
-    }, []);
-
-    useEffect(() => {
-        localStorage.setItem("kj_partners", JSON.stringify(partners));
-    }, [partners]);
-
-    useEffect(() => {
-        localStorage.setItem("kj_jobs", JSON.stringify(jobs));
-    }, [jobs]);
-
     // Lead-Scanner über OpenStreetMap
     const startScan = async () => {
         setIsScanning(true);
