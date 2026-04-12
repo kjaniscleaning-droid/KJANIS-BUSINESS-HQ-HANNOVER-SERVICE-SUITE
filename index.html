@@ -3,253 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KJANIS HQ | Platinum Suite</title>
+    <title>KJANIS HQ | Ultimate V16.5</title>
     
-    <!-- Core Engine: React, Firebase & Tailwind -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind & UI Performance -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #020617; color: white; overflow-x: hidden; }
-        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
-        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
-        ::-webkit-scrollbar { width: 0px; }
+        body { font-family: 'Inter', sans-serif; background-color: #020617; color: white; margin: 0; overflow: hidden; }
+        .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,0.08); }
+        .nav-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .nav-btn:active { transform: scale(0.9); }
+        #root { height: 100vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .tab-content { animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel">
-        // --- Configuration ---
-        const firebaseConfig = window.__firebase_config ? JSON.parse(window.__firebase_config) : { apiKey: "demo" };
-        const appId = window.__app_id || 'kjanis-hq-v16';
-        
-        // Init Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+    <script type="module">
+        import React, { useState, useEffect, useRef } from 'https://esm.sh/react@18.2.0';
+        import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
 
-        // --- Components ---
-        const IconStats = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
-        const IconPlus = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>;
-        const IconRadar = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12l3 3"/><path d="M12 3v3"/><path d="M12 18v3"/><path d="M3 12h3"/><path d="M18 12h3"/></svg>;
-        const IconPartner = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-        const IconTrash = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>;
+        // --- Firebase Config & App ID ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "github-fallback" };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-hq-v16';
+
+        // --- Icons ---
+        const IconStats = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5" }, 
+            React.createElement('line', { x1: "18", y1: "20", x2: "18", y2: "10" }),
+            React.createElement('line', { x1: "12", y1: "20", x2: "12", y2: "4" }),
+            React.createElement('line', { x1: "6", y1: "20", x2: "6", y2: "14" })
+        );
+        const IconPlus = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5" },
+            React.createElement('circle', { cx: "12", cy: "12", r: "10" }),
+            React.createElement('line', { x1: "12", y1: "8", x2: "12", y2: "16" }),
+            React.createElement('line', { x1: "8", y1: "12", x2: "16", y2: "12" })
+        );
+        const IconRadar = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5" },
+            React.createElement('circle', { cx: "12", cy: "12", r: "9" }),
+            React.createElement('path', { d: "M12 12l3 3" }), React.createElement('path', { d: "M12 3v3" }), React.createElement('path', { d: "M12 18v3" })
+        );
+        const IconPartner = () => React.createElement('svg', { width: "24", height: "24", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5" },
+            React.createElement('path', { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
+            React.createElement('circle', { cx: "9", cy: "7", r: "4" })
+        );
 
         const App = () => {
-            const [user, setUser] = React.useState(null);
-            const [loading, setLoading] = React.useState(true);
-            const [activeTab, setActiveTab] = React.useState('dash');
-            const [privacyMode, setPrivacyMode] = React.useState(false);
-            const [notification, setNotification] = React.useState(null);
+            const [user, setUser] = useState(null);
+            const [activeTab, setActiveTab] = useState('dash');
+            const [privacyMode, setPrivacyMode] = useState(false);
+            const [notification, setNotification] = useState(null);
+            const [stats, setStats] = useState({ own: 0, prov: 0 });
+            const [jobs, setJobs] = useState([]);
+            const [partners, setPartners] = useState([]);
+            const [radar, setRadar] = useState([]);
             
-            const [stats, setStats] = React.useState({ own: 0, prov: 0 });
-            const [jobs, setJobs] = React.useState([]);
-            const [partners, setPartners] = React.useState([]);
-            const [radarLeads, setRadarLeads] = React.useState([]);
-            
-            const [formData, setFormData] = React.useState({ name: '', val: '', type: 'own', partnerId: '' });
-            const [pData, setPData] = React.useState({ name: '', email: '' });
-            
-            const printRef = React.useRef();
+            // UI State
+            const [form, setForm] = useState({ name: '', val: '', type: 'own', partnerId: '' });
+            const [pForm, setPForm] = useState({ name: '', email: '' });
+            const printRef = useRef();
 
-            const notify = (msg) => { setNotification(msg); setTimeout(() => setNotification(null), 3000); };
-            const formatMoney = (val) => privacyMode ? "••••,•• €" : (val || 0).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + " €";
+            const notify = (m) => { setNotification(m); setTimeout(() => setNotification(null), 3000); };
+            const formatMoney = (v) => privacyMode ? "••••,•• €" : (v || 0).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + " €";
 
-            // 1. Auth & Data
-            React.useEffect(() => {
-                auth.signInAnonymously().catch(console.error);
-                auth.onAuthStateChanged(u => {
+            useEffect(() => {
+                const fbApp = initializeApp(firebaseConfig);
+                const auth = getAuth(fbApp);
+                const db = getFirestore(fbApp);
+
+                signInAnonymously(auth).catch(console.error);
+                onAuthStateChanged(auth, u => {
                     setUser(u);
-                    if (u) setLoading(false);
+                    if (u) {
+                        const path = `artifacts/${appId}/users/${u.uid}`;
+                        onSnapshot(collection(db, `${path}/partners`), s => {
+                            setPartners(s.docs.map(d => ({id: d.id, ...d.data()})));
+                        });
+                        onSnapshot(collection(db, `${path}/jobs`), s => {
+                            const list = s.docs.map(d => ({id: d.id, ...d.data()}));
+                            setJobs(list);
+                            let o = 0, p = 0;
+                            list.forEach(j => {
+                                if(j.type === 'own') o += Number(j.val);
+                                else p += (Number(j.val) * 0.3);
+                            });
+                            setStats({ own: o, prov: p });
+                        });
+                    }
                 });
             }, []);
 
-            React.useEffect(() => {
-                if (!user) return;
-                
-                const path = `artifacts/${appId}/users/${user.uid}`;
-                
-                // Partners Sync
-                const unsubP = db.collection(`${path}/partners`).onSnapshot(s => {
-                    setPartners(s.docs.map(d => ({id: d.id, ...d.data()})));
+            const handleSave = async () => {
+                if(!form.name || !form.val) return notify("⚠️ Daten fehlen!");
+                const fbApp = initializeApp(firebaseConfig);
+                const db = getFirestore(fbApp);
+                await addDoc(collection(db, `artifacts/${appId}/users/${user.uid}/jobs`), {
+                    ...form, val: Number(form.val), date: new Date().toISOString()
                 });
-
-                // Jobs Sync & Calc
-                const unsubJ = db.collection(`${path}/jobs`).orderBy('date', 'desc').onSnapshot(s => {
-                    const list = s.docs.map(d => ({id: d.id, ...d.data()}));
-                    setJobs(list);
-                    let o = 0, p = 0;
-                    list.forEach(j => {
-                        if (j.type === 'own') o += Number(j.val);
-                        else p += (Number(j.val) * 0.3); // 30% Marge
-                    });
-                    setStats({ own: o, prov: p });
-                });
-
-                return () => { unsubP(); unsubJ(); };
-            }, [user]);
-
-            // Actions
-            const saveJob = async () => {
-                if (!formData.name || !formData.val) return notify("⚠️ Daten fehlen!");
-                await db.collection(`artifacts/${appId}/users/${user.uid}/jobs`).add({
-                    ...formData, val: Number(formData.val), date: new Date().toISOString()
-                });
-                setFormData({ name: '', val: '', type: 'own', partnerId: '' });
+                setForm({ name: '', val: '', type: 'own', partnerId: '' });
                 setActiveTab('dash');
-                notify("✅ In Cloud gesichert");
+                notify("✅ Cloud-Save erfolgreich");
             };
 
             const addPartner = async () => {
-                if (!pData.name || !pData.email) return notify("⚠️ Name/Mail fehlt!");
-                await db.collection(`artifacts/${appId}/users/${user.uid}/partners`).add(pData);
-                setPData({ name: '', email: '' });
-                notify("🤝 Partner gelistet");
+                if(!pForm.name) return notify("⚠️ Name fehlt!");
+                const fbApp = initializeApp(firebaseConfig);
+                const db = getFirestore(fbApp);
+                await addDoc(collection(db, `artifacts/${appId}/users/${user.uid}/partners`), pForm);
+                setPForm({ name: '', email: '' });
+                notify("🤝 Partner registriert");
             };
 
-            const scanMarket = () => {
-                notify("📡 KI scannt Hannover...");
-                setTimeout(() => {
-                    setRadarLeads([
-                        {id: 1, name: "Hausflur Reinigung List", loc: "Hannover Mitte", val: 450},
-                        {id: 2, name: "Gartenpflege Ricklingen", loc: "Hannover Süd", val: 890},
-                        {id: 3, name: "Büroreinigung Vahrenwald", loc: "Hannover Nord", val: 1200}
-                    ]);
-                    notify("✅ 3 neue Leads gefunden");
-                }, 1500);
-            };
+            return React.createElement('div', { className: "min-h-screen pb-32" },
+                notification && React.createElement('div', { className: "fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl" }, notification),
+                
+                React.createElement('header', { className: "p-8 flex justify-between items-center" },
+                    React.createElement('div', null,
+                        React.createElement('h1', { className: "text-2xl font-black italic uppercase leading-none tracking-tighter" }, "KJANIS ", React.createElement('span', { className: "text-blue-500" }, "HQ")),
+                        React.createElement('p', { className: "text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1" }, "Ultimate Platinum V16.5")
+                    ),
+                    React.createElement('button', { onClick: () => setPrivacyMode(!privacyMode), className: "p-4 glass rounded-2xl border border-white/5 active:scale-90" }, privacyMode ? '🔒' : '👁️')
+                ),
 
-            if (loading) return (
-                <div className="min-h-screen flex items-center justify-center">
-                    <div className="w-12 h-12 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin"></div>
-                </div>
-            );
+                React.createElement('main', { className: "max-w-md mx-auto px-6 space-y-6" },
+                    activeTab === 'dash' && React.createElement('div', { className: "tab-content space-y-6" },
+                        React.createElement('div', { className: "p-10 rounded-[2.5rem] glass shadow-2xl text-center relative overflow-hidden" },
+                            React.createElement('div', { className: "absolute top-0 left-0 w-full h-1 bg-blue-500" }),
+                            React.createElement('p', { className: "text-[9px] text-slate-500 font-black uppercase mb-2" }, "Profit (Online)"),
+                            React.createElement('h2', { className: "text-5xl font-black italic tracking-tighter leading-none" }, formatMoney(stats.own + stats.prov))
+                        ),
+                        React.createElement('div', { className: "grid grid-cols-2 gap-4" },
+                            React.createElement('div', { className: "p-6 glass rounded-3xl text-center border-b-2 border-emerald-500" },
+                                React.createElement('p', { className: "text-[8px] text-slate-500 font-bold mb-1" }, "EIGEN"),
+                                React.createElement('p', { className: "text-emerald-400 font-black" }, formatMoney(stats.own))
+                            ),
+                            React.createElement('div', { className: "p-6 glass rounded-3xl text-center border-b-2 border-blue-500" },
+                                React.createElement('p', { className: "text-[8px] text-slate-500 font-bold mb-1" }, "MARGE"),
+                                React.createElement('p', { className: "text-blue-400 font-black" }, formatMoney(stats.prov))
+                            )
+                        ),
+                        React.createElement('div', { className: "space-y-2" },
+                            jobs.slice(0,3).map(j => React.createElement('div', { key: j.id, className: "p-4 glass rounded-2xl flex justify-between items-center" },
+                                React.createElement('span', { className: "text-[10px] font-bold" }, j.name),
+                                React.createElement('span', { className: "text-emerald-400 font-black text-xs" }, j.val, " €")
+                            ))
+                        )
+                    ),
 
-            return (
-                <div className="max-w-md mx-auto min-h-screen relative pb-32">
-                    {notification && (
-                        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl animate-bounce">
-                            {notification}
-                        </div>
-                    )}
+                    activeTab === 'plus' && React.createElement('div', { className: "tab-content glass p-8 rounded-[2.5rem] space-y-4" },
+                        React.createElement('h3', { className: "text-center font-black text-blue-500 uppercase italic" }, "Buchung"),
+                        React.createElement('input', { placeholder: "Kunde", className: "w-full bg-slate-900 p-5 rounded-2xl outline-none text-center", value: form.name, onChange: e => setForm({...form, name: e.target.value}) }),
+                        React.createElement('input', { type: "number", placeholder: "Summe €", className: "w-full bg-slate-900 p-5 rounded-2xl outline-none text-center", value: form.val, onChange: e => setForm({...form, val: e.target.value}) }),
+                        React.createElement('select', { className: "w-full bg-slate-900 p-5 rounded-2xl outline-none text-center text-slate-400", value: form.type, onChange: e => setForm({...form, type: e.target.value}) },
+                            React.createElement('option', { value: "own" }, "Eigene Arbeit"),
+                            React.createElement('option', { value: "partner" }, "Partner")
+                        ),
+                        React.createElement('button', { onClick: handleSave, className: "w-full bg-blue-600 py-6 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95" }, "Speichern")
+                    ),
 
-                    <header className="p-8 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-black italic uppercase leading-none tracking-tighter">KJANIS <span className="text-blue-500 font-black">HQ</span></h1>
-                            <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">Master Platinum V16.3</p>
-                        </div>
-                        <button onClick={() => setPrivacyMode(!privacyMode)} className="p-4 glass rounded-2xl active:scale-90 transition-all">
-                            {privacyMode ? '🔒' : '👁️'}
-                        </button>
-                    </header>
+                    activeTab === 'radar' && React.createElement('div', { className: "tab-content space-y-4 text-center" },
+                        React.createElement('div', { className: "p-8 glass rounded-[2.5rem]" },
+                            React.createElement('h3', { className: "font-black text-blue-500 uppercase italic mb-4" }, "KI Markt-Scan"),
+                            React.createElement('button', { onClick: () => notify("📡 Suche Hannover..."), className: "w-full bg-slate-800 py-4 rounded-xl font-black uppercase text-[10px]" }, "Scan Starten")
+                        ),
+                        React.createElement('p', { className: "text-slate-600 text-[10px] italic" }, "Warte auf Cloud-Signale...")
+                    ),
 
-                    <main className="px-6 space-y-6">
-                        {activeTab === 'dash' && (
-                            <div className="space-y-6 animate-fade-in">
-                                <div className="p-10 rounded-[2.5rem] glass shadow-2xl text-center relative overflow-hidden">
-                                    <div className="absolute top-0 left-0 w-full h-1 bg-blue-500" />
-                                    <p className="text-[9px] text-slate-500 font-black uppercase mb-2">Gesamt-Profit (Online)</p>
-                                    <h2 className="text-5xl font-black italic tracking-tighter leading-none">{formatMoney(stats.own + stats.prov)}</h2>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-6 glass rounded-[2rem] text-center">
-                                        <p className="text-[8px] text-slate-500 font-black mb-1">EIGEN</p>
-                                        <p className="text-emerald-400 font-black text-lg leading-none">{formatMoney(stats.own)}</p>
-                                    </div>
-                                    <div className="p-6 glass rounded-[2rem] text-center">
-                                        <p className="text-[8px] text-slate-500 font-black mb-1">PROVISION</p>
-                                        <p className="text-blue-400 font-black text-lg leading-none">{formatMoney(stats.prov)}</p>
-                                    </div>
-                                </div>
-                                <div className="space-y-3">
-                                    <p className="text-[9px] font-black text-slate-600 uppercase ml-2 tracking-widest leading-none">Journal</p>
-                                    {jobs.slice(0,3).map(j => (
-                                        <div key={j.id} className="p-5 glass rounded-2xl flex justify-between items-center">
-                                            <div className="text-left">
-                                                <p className="text-[10px] font-black uppercase leading-none">{j.name}</p>
-                                                <p className="text-[8px] text-slate-500 mt-1 uppercase font-bold">{j.date.split('T')[0]}</p>
-                                            </div>
-                                            <span className="text-emerald-400 font-black text-xs">{j.val} €</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    activeTab === 'partners' && React.createElement('div', { className: "tab-content space-y-6" },
+                        React.createElement('div', { className: "p-8 glass rounded-[2.5rem] space-y-4" },
+                            React.createElement('h3', { className: "text-center font-black text-emerald-500 uppercase italic" }, "Partner-Pool"),
+                            React.createElement('input', { placeholder: "Name", className: "w-full bg-slate-900 p-4 rounded-xl outline-none text-center", value: pForm.name, onChange: e => setPForm({...pForm, name: e.target.value}) }),
+                            React.createElement('button', { onClick: addPartner, className: "w-full bg-emerald-600 py-4 rounded-xl font-black uppercase text-[10px]" }, "Hinzufügen")
+                        ),
+                        partners.map(p => React.createElement('div', { key: p.id, className: "p-5 glass rounded-2xl flex justify-between items-center" },
+                            React.createElement('span', { className: "text-xs font-bold" }, p.name),
+                            React.createElement('span', { className: "text-[8px] text-slate-500" }, "AKTIV")
+                        ))
+                    )
+                ),
 
-                        {activeTab === 'plus' && (
-                            <div className="p-8 glass rounded-[2.5rem] space-y-4 animate-fade-in">
-                                <h3 className="text-center font-black text-blue-500 uppercase italic">Buchungssystem</h3>
-                                <input type="text" placeholder="Kunde" className="w-full bg-slate-900 p-5 rounded-2xl border border-white/5 outline-none text-center" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-                                <input type="number" placeholder="Summe €" className="w-full bg-slate-900 p-5 rounded-2xl border border-white/5 outline-none text-center" value={formData.val} onChange={e => setFormData({...formData, val: e.target.value})} />
-                                <select className="w-full bg-slate-900 p-5 rounded-2xl border border-white/5 text-slate-400 text-center" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                                    <option value="own">Eigene Arbeit (100%)</option>
-                                    <option value="partner">Partner (Marge)</option>
-                                </select>
-                                <button onClick={saveJob} className="w-full bg-blue-600 py-6 rounded-2xl font-black uppercase text-xs btn-active shadow-lg shadow-blue-900/40 italic">In Cloud Speichern</button>
-                            </div>
-                        )}
-
-                        {activeTab === 'radar' && (
-                            <div className="space-y-4 animate-fade-in text-center">
-                                <div className="p-8 glass rounded-[2.5rem]">
-                                    <h3 className="font-black text-blue-500 uppercase mb-4 italic">KI Markt-Radar</h3>
-                                    <button onClick={scanMarket} className="w-full bg-slate-800 py-4 rounded-xl font-black uppercase text-[10px] btn-active">Hannover Scan starten</button>
-                                </div>
-                                {radarLeads.map(l => (
-                                    <div key={l.id} className="p-6 glass rounded-2xl flex justify-between items-center text-left border-l-4 border-blue-500">
-                                        <div className="text-left">
-                                            <p className="text-[9px] font-black text-blue-500 uppercase leading-none">{l.loc}</p>
-                                            <p className="text-xs font-black uppercase mt-1 leading-none">{l.name}</p>
-                                            <p className="text-emerald-400 font-black mt-2 leading-none">{l.val} €</p>
-                                        </div>
-                                        <button onClick={() => {setFormData({name: l.name, val: l.val, type: 'partner'}); setActiveTab('plus');}} className="bg-blue-600 px-5 py-3 rounded-xl text-[9px] font-black uppercase">Deal</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {activeTab === 'partners' && (
-                            <div className="space-y-4 animate-fade-in">
-                                <div className="p-8 glass rounded-[2.5rem] space-y-4 text-center">
-                                    <h3 className="font-black text-emerald-500 uppercase italic">Firmen-Pool</h3>
-                                    <input type="text" placeholder="Firmenname" className="w-full bg-slate-900 p-4 rounded-xl border border-white/5 text-center" value={pData.name} onChange={e => setPData({...pData, name: e.target.value})} />
-                                    <input type="email" placeholder="E-Mail" className="w-full bg-slate-900 p-4 rounded-xl border border-white/5 text-center" value={pData.email} onChange={e => setPData({...pData, email: e.target.value})} />
-                                    <button onClick={addPartner} className="w-full bg-emerald-600 py-4 rounded-xl font-black uppercase text-[10px] btn-active shadow-lg shadow-emerald-900/40">Partner registrieren</button>
-                                </div>
-                                {partners.map(p => (
-                                    <div key={p.id} className="p-5 glass rounded-2xl flex justify-between items-center">
-                                        <div className="text-left">
-                                            <p className="text-[10px] font-black uppercase leading-none">{p.name}</p>
-                                            <p className="text-[8px] text-slate-500 mt-1 uppercase font-bold">{p.email}</p>
-                                        </div>
-                                        <button onClick={() => db.collection(`artifacts/${appId}/users/${user.uid}/partners`).doc(p.id).delete()} className="text-slate-600"><IconTrash/></button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </main>
-
-                    <nav className="fixed bottom-10 left-8 right-8 glass rounded-[3rem] p-8 flex justify-around shadow-2xl z-40">
-                        <button onClick={() => setActiveTab('dash')} className={`transition-all ${activeTab === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconStats /></button>
-                        <button onClick={() => setActiveTab('plus')} className={`transition-all ${activeTab === 'plus' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconPlus /></button>
-                        <button onClick={() => setActiveTab('radar')} className={`transition-all ${activeTab === 'radar' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconRadar /></button>
-                        <button onClick={() => setActiveTab('partners')} className={`transition-all ${activeTab === 'partners' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconPartner /></button>
-                    </nav>
-                </div>
+                React.createElement('nav', { className: "fixed bottom-10 left-8 right-8 glass rounded-[3rem] p-8 flex justify-around shadow-2xl z-40" },
+                    React.createElement('button', { onClick: () => setActiveTab('dash'), className: `nav-btn ${activeTab === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600'}` }, React.createElement(IconStats, null)),
+                    React.createElement('button', { onClick: () => setActiveTab('plus'), className: `nav-btn ${activeTab === 'plus' ? 'text-blue-500 scale-125' : 'text-slate-600'}` }, React.createElement(IconPlus, null)),
+                    React.createElement('button', { onClick: () => setActiveTab('radar'), className: `nav-btn ${activeTab === 'radar' ? 'text-blue-500 scale-125' : 'text-slate-600'}` }, React.createElement(IconRadar, null)),
+                    React.createElement('button', { onClick: () => setActiveTab('partners'), className: `nav-btn ${activeTab === 'partners' ? 'text-blue-500 scale-125' : 'text-slate-600'}` }, React.createElement(IconPartner, null))
+                )
             );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(React.createElement(App));
     </script>
 </body>
 </html>
