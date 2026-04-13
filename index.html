@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KJANIS HQ | Ultimate Cloud V34.0</title>
+    <title>KJANIS HQ | Enterprise V36.0 Online</title>
     
-    <!-- Frameworks: Ohne diese sieht man nur Text -->
+    <!-- Enterprise Engines -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Firebase Cloud System (Modern Modular) -->
+    <!-- Firebase SDK Modular -->
     <script type="importmap">
     {
       "imports": {
@@ -40,7 +40,7 @@
         .glass-panel { 
             background: rgba(15, 23, 42, 0.95); 
             backdrop-filter: blur(25px); 
-            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
             border-radius: 2.8rem;
         }
 
@@ -50,7 +50,7 @@
             filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)); 
         }
 
-        .page-fade { animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+        .page-fade { animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
         @media print {
@@ -59,32 +59,38 @@
             .glass-panel { border: 1px solid #ddd; background: white; color: black; }
         }
 
-        /* iPad Optimierung für Touch */
+        /* Touch-Optimierung */
         input, select, button { font-size: 16px !important; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- WICHTIG: Babel übersetzt den Code in Echtzeit -->
     <script type="text/babel" data-type="module">
         import { initializeApp } from "firebase/app";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, query, orderBy } from "firebase/firestore";
+        import { getFirestore, collection, doc, onSnapshot, addDoc, deleteDoc, query } from "firebase/firestore";
 
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // --- Cloud Konfiguration ---
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // --- AUTOMATISCHE CLOUD KONFIGURATION ---
+        // Falls du die App außerhalb dieser Umgebung nutzt, kannst du hier dein eigenes Firebase-Objekt einfügen.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : { 
+                apiKey: "DEIN_API_KEY", 
+                authDomain: "DEIN_PROJEKT.firebaseapp.com", 
+                projectId: "DEIN_PROJEKT_ID" 
+            };
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-hq-v34';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-hq-v36';
 
+        // HQ Icon Komponente
         const HQIcon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { 
-                if (window.lucide) window.lucide.createIcons(); 
-            }, [name, size, className]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
         };
 
@@ -105,7 +111,7 @@
                 setTimeout(() => setNotif(null), 3000); 
             };
 
-            // Login-Sequenz
+            // --- Cloud Login Sequenz (Regel 3) ---
             useEffect(() => {
                 const initAuth = async () => {
                     try {
@@ -114,32 +120,34 @@
                         } else {
                             await signInAnonymously(auth);
                         }
-                    } catch (e) { console.error("Auth-Error", e); }
+                    } catch (e) { console.error("Cloud Error", e); }
                 };
                 initAuth();
-                const unsubscribe = onAuthStateChanged(auth, setUser);
-                return () => unsubscribe();
+                return onAuthStateChanged(auth, setUser);
             }, []);
 
-            // Echtzeit Daten-Sync
+            // --- Echtzeit Daten-Sync (Regel 1) ---
             useEffect(() => {
                 if (!user) return;
-                const base = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
-                const pBase = collection(db, 'artifacts', appId, 'users', user.uid, 'partners');
                 
-                const unsubJ = onSnapshot(base, (s) => {
+                // Korrekte Pfade nach Regel 1
+                const jobsPath = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
+                const partnersPath = collection(db, 'artifacts', appId, 'users', user.uid, 'partners');
+                
+                const unsubJ = onSnapshot(jobsPath, (s) => {
                     const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
                     list.sort((a, b) => new Date(b.date) - new Date(a.date));
                     setJobs(list);
                 });
 
-                const unsubP = onSnapshot(pBase, (s) => {
+                const unsubP = onSnapshot(partnersPath, (s) => {
                     setPartners(s.docs.map(d => ({ id: d.id, ...d.data() })));
                 });
 
                 return () => { unsubJ(); unsubP(); };
             }, [user]);
 
+            // --- Profit Berechnung (Regel 2) ---
             const stats = useMemo(() => {
                 let own = 0, prov = 0;
                 jobs.forEach(j => {
@@ -154,13 +162,13 @@
             }, [jobs, partners]);
 
             const saveJob = async () => {
-                if (!form.name || !form.val) return notify("⚠️ Daten prüfen!");
+                if (!form.name || !form.val) return notify("⚠️ Daten unvollständig!");
                 try {
                     const base = collection(db, 'artifacts', appId, 'users', user.uid, 'jobs');
                     await addDoc(base, { ...form, val: Number(form.val), date: new Date().toISOString() });
                     setForm({ name: '', val: '', type: 'own', partnerId: '' });
                     setView('dash');
-                    notify("✅ Cloud-Sync erfolgt");
+                    notify("✅ Auftrag online gesichert");
                 } catch (e) { notify("❌ Speicherfehler"); }
             };
 
@@ -177,32 +185,29 @@
 
             if (!user) return (
                 <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-6">
-                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin shadow-[0_0_25px_#3b82f6]"></div>
-                    <p className="text-blue-500 font-black uppercase tracking-[0.5em] text-[10px]">Verbinde Cloud-HQ...</p>
+                    <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin shadow-[0_0_20px_#3b82f6]"></div>
+                    <p className="text-blue-500 font-black uppercase tracking-[0.4em] text-[10px]">Cloud-Verbindung wird aufgebaut...</p>
                 </div>
             );
 
             return (
                 <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 pb-44">
                     {notif && (
-                        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 px-10 py-3 rounded-full font-black text-[11px] tracking-widest uppercase shadow-2xl animate-bounce no-print">
+                        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl animate-bounce no-print">
                             {notif}
                         </div>
                     )}
 
                     <header className="flex justify-between items-center mb-10 mt-4 no-print">
-                        <div className="flex flex-col text-left">
+                        <div className="text-left">
                             <h1 className="text-3xl font-black italic tracking-tighter uppercase leading-none">
                                 KJANIS <span className="text-blue-500">HQ</span>
                             </h1>
-                            <div className="flex items-center gap-2 mt-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]"></div>
-                                <span className="text-[8px] font-black uppercase tracking-[0.4em] text-slate-500">Cloud Enterprise V34.0</span>
-                            </div>
+                            <p className="text-[8px] font-bold uppercase tracking-[0.4em] text-slate-500 mt-2">Enterprise Suite V36.0 // Online</p>
                         </div>
                         <button 
                             onClick={() => { setPrivacy(!privacy); if(!privacy) setLocked(true); }} 
-                            className={`p-4 rounded-[1.5rem] transition-all active:scale-90 ${privacy ? 'bg-blue-600 shadow-[0_0_20px_#2563eb66]' : 'bg-slate-900 border border-white/10 text-slate-500'}`}
+                            className={`p-4 rounded-2xl transition-all ${privacy ? 'bg-blue-600 shadow-xl' : 'bg-slate-900 border border-white/10 text-slate-500'}`}
                         >
                             <HQIcon name={privacy ? "lock" : "eye"} size={22} />
                         </button>
@@ -212,18 +217,13 @@
                         {view === 'dash' && (
                             <div className="space-y-6">
                                 <div className="glass-panel p-12 text-center relative overflow-hidden shadow-2xl border-t-2 border-blue-500">
-                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-6 text-center">Netto-Profit (Cloud-Live)</p>
+                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-6">Netto-Profit (Cloud-Live)</p>
                                     <div className="relative h-20 flex items-center justify-center">
-                                        <h2 className={`text-6xl font-black italic tracking-tighter transition-all ${privacy && locked ? 'blur-3xl opacity-10 scale-90' : ''}`}>
+                                        <h2 className={`text-6xl font-black italic tracking-tighter transition-all ${privacy && locked ? 'blur-3xl opacity-10' : ''}`}>
                                             {formatEur(stats.total)}
                                         </h2>
                                         {privacy && locked && (
-                                            <button 
-                                                onClick={unlock} 
-                                                className="absolute bg-blue-600 px-12 py-5 rounded-[2rem] font-black text-[11px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all"
-                                            >
-                                                Entsperren
-                                            </button>
+                                            <button onClick={unlock} className="absolute bg-blue-600 px-10 py-4 rounded-2xl font-black text-[11px] uppercase shadow-xl active:scale-95">Entsperren</button>
                                         )}
                                     </div>
                                 </div>
@@ -234,13 +234,13 @@
                                         <p className={`text-emerald-400 font-black text-xl ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.own)}</p>
                                     </div>
                                     <div className="glass-panel p-6 text-center">
-                                        <p className="text-[8px] text-slate-500 font-bold uppercase mb-2">Provisionen</p>
+                                        <p className="text-[8px] text-slate-500 font-bold uppercase mb-2">Margen</p>
                                         <p className={`text-blue-400 font-black text-xl ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.prov)}</p>
                                     </div>
                                 </div>
 
                                 <div className="space-y-4 no-print">
-                                    <p className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest text-left">Buchungs-Journal</p>
+                                    <p className="text-[10px] font-black uppercase text-slate-600 ml-2 text-left tracking-widest">Aufträge Hannover</p>
                                     {jobs.slice(0,5).map(j => (
                                         <div key={j.id} className="glass-panel p-6 flex justify-between items-center group animate-in slide-in-from-left duration-300">
                                             <div className="text-left">
@@ -249,23 +249,16 @@
                                             </div>
                                             <div className="flex items-center gap-5">
                                                 <span className={`font-black text-sm ${privacy && locked ? 'blur-sm' : ''}`}>{formatEur(j.val)}</span>
-                                                <button 
-                                                    onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', j.id))} 
-                                                    className="text-slate-800 hover:text-red-500 transition-all active:scale-75 p-2"
-                                                >
-                                                    <HQIcon name="trash-2" size={16}/>
-                                                </button>
+                                                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'jobs', j.id))} className="text-slate-800 hover:text-red-500 p-2"><HQIcon name="trash-2" size={16}/></button>
                                             </div>
                                         </div>
                                     ))}
+                                    {jobs.length === 0 && (
+                                        <div className="p-10 text-center glass-panel border-dashed opacity-50 italic">Keine Aufträge online</div>
+                                    )}
                                 </div>
 
-                                <button 
-                                    onClick={() => window.print()} 
-                                    className="w-full bg-slate-900 border border-white/5 py-7 rounded-[2.5rem] font-bold text-[11px] uppercase flex justify-center items-center gap-4 active:scale-95 no-print shadow-xl"
-                                >
-                                    <HQIcon name="printer" size={18}/> Finanzbericht drucken
-                                </button>
+                                <button onClick={() => window.print()} className="w-full bg-slate-900 border border-white/5 py-7 rounded-[2.5rem] font-bold text-[11px] uppercase flex justify-center items-center gap-4 active:scale-95 no-print shadow-xl"><HQIcon name="printer" size={18}/> Finanzbericht drucken</button>
                             </div>
                         )}
 
@@ -274,20 +267,20 @@
                                 <HQIcon name="zap" size={48} className="mx-auto text-blue-500 mb-2" />
                                 <h3 className="font-black text-blue-500 uppercase italic tracking-wider text-3xl">Buchung</h3>
                                 <div className="space-y-4 text-left">
-                                    <input type="text" placeholder="Kunde / Projektname" className="w-full bg-[#020617] p-7 rounded-[2rem] border border-white/5 text-center outline-none focus:border-blue-500/50 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                                    <input type="number" placeholder="Netto-Summe €" className="w-full bg-[#020617] p-7 rounded-[2rem] border border-white/5 text-center outline-none focus:border-blue-500/50" value={form.val} onChange={e => setForm({...form, val: e.target.value})} />
+                                    <input type="text" placeholder="Kunde / Projekt" className="w-full bg-[#020617] p-7 rounded-[2rem] border border-white/5 text-center outline-none focus:border-blue-500/50 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                                    <input type="number" placeholder="Netto €" className="w-full bg-[#020617] p-7 rounded-[2rem] border border-white/5 text-center outline-none" value={form.val} onChange={e => setForm({...form, val: e.target.value})} />
                                     <select className="w-full bg-[#020617] p-7 rounded-[2rem] border border-white/5 text-slate-400 text-sm text-center outline-none appearance-none" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
                                         <option value="own">Eigene Leistung (100%)</option>
-                                        <option value="partner">Partner-Projekt (Marge)</option>
+                                        <option value="partner">Partner-Deal (Marge)</option>
                                     </select>
                                     {form.type === 'partner' && (
-                                        <select className="w-full bg-blue-900/20 p-7 rounded-[2rem] border border-blue-500/50 text-blue-400 font-black text-center animate-in zoom-in" value={form.partnerId} onChange={e => setForm({...form, partnerId: e.target.value})}>
+                                        <select className="w-full bg-blue-900/20 p-7 rounded-[2rem] border border-blue-500/50 text-blue-400 font-black text-center" value={form.partnerId} onChange={e => setForm({...form, partnerId: e.target.value})}>
                                             <option value="">Partner wählen...</option>
                                             {partners.map(p => <option key={p.id} value={p.id}>{p.name} ({p.marge}%)</option>)}
                                         </select>
                                     )}
                                 </div>
-                                <button onClick={saveJob} className="w-full bg-blue-600 py-8 rounded-[2.8rem] font-black uppercase text-[13px] tracking-widest shadow-2xl mt-6 active:scale-95 transition-all">Jetzt Speichern</button>
+                                <button onClick={saveJob} className="w-full bg-blue-600 py-8 rounded-[2.8rem] font-black uppercase text-[13px] tracking-widest shadow-2xl mt-6 active:scale-95 transition-all">Sichern</button>
                             </div>
                         )}
 
@@ -295,7 +288,7 @@
                             <div className="glass-panel p-12 text-center space-y-8 no-print animate-in slide-in-from-right">
                                 <HQIcon name="search" size={56} className="mx-auto text-blue-500" />
                                 <h3 className="font-black text-blue-500 uppercase italic tracking-widest text-3xl">Lead-Radar</h3>
-                                <button className="w-full bg-blue-600 py-7 rounded-[2.5rem] font-black text-[12px] uppercase shadow-2xl active:scale-95">KI Hannover scannen</button>
+                                <button className="w-full bg-blue-600 py-7 rounded-[2.5rem] font-black text-[12px] uppercase shadow-2xl active:scale-95">KI Hannover Nord scannen</button>
                                 <p className="text-[12px] text-slate-600 font-black uppercase tracking-[0.2em] leading-relaxed px-6">Die Markt-Analyse für Hannover Nord ist aktiv. Zur Zeit liegen keine neuen Buchungsanfragen vor.</p>
                             </div>
                         )}
@@ -316,7 +309,7 @@
                                         await addDoc(base, { name: n, marge: Number(m), date: new Date().toISOString() });
                                         document.getElementById('pn').value = ''; document.getElementById('pm').value = ''; 
                                         notify("🤝 Partner registriert");
-                                    }} className="w-full bg-emerald-600 py-7 rounded-[2.2rem] font-black text-[12px] uppercase active:scale-95 shadow-xl">Hinzufügen</button>
+                                    }} className="w-full bg-emerald-600 py-7 rounded-[2.2rem] font-black text-[12px] uppercase active:scale-95 shadow-xl">Listen</button>
                                 </div>
                                 <div className="space-y-3 pb-12">
                                     {partners.map(p => (
@@ -325,9 +318,7 @@
                                                 <p className="text-base font-black uppercase tracking-tight">{p.name}</p>
                                                 <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-[0.4em]">{p.marge}% Provision</p>
                                             </div>
-                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'partners', p.id))} className="text-slate-700 hover:text-red-500 p-3">
-                                                <HQIcon name="trash-2" size={24}/>
-                                            </button>
+                                            <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'partners', p.id))} className="text-slate-700 hover:text-red-500 p-3"><HQIcon name="trash-2" size={24}/></button>
                                         </div>
                                     ))}
                                 </div>
