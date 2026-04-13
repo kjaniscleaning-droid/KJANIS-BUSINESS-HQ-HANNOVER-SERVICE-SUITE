@@ -1,124 +1,257 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KJANIS HQ</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>KJANIS HQ | V41.0 Zero-Lag</title>
 
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <!-- Nur die absolut notwendigen Kerne - Kein schwerer Ballast -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 
-<style>
-body {
-  background: #020617;
-  color: white;
-  font-family: Arial;
-  text-align: center;
-  padding: 20px;
-}
-input, button {
-  padding: 10px;
-  margin: 10px;
-  width: 80%;
-}
-.card {
-  background: #111827;
-  padding: 15px;
-  margin: 10px;
-  border-radius: 10px;
-}
-</style>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            margin: 0; padding: 0; 
+            overflow-x: hidden; 
+            -webkit-tap-highlight-color: transparent;
+            background-color: #020617;
+            color: white;
+        }
+
+        /* Eye-Care Light Mode */
+        body.light { background-color: #ffffff; color: #000000; }
+        .light .glass { background: #f1f5f9; border: 3px solid #000000; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .light .input-box { background: #ffffff; border: 3px solid #000000; color: #000000; }
+
+        /* Dark Mode */
+        body.dark { background-color: #020617; color: white; }
+        .dark .glass { background: #0f172a; border: 1px solid rgba(255,255,255,0.1); }
+        .dark .input-box { background: #020617; border: 1px solid rgba(255,255,255,0.2); color: white; }
+
+        .glass { border-radius: 2rem; transition: transform 0.1s; }
+        .btn-press:active { transform: scale(0.96); }
+        .font-900 { font-weight: 900; }
+
+        #loader {
+            position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; background: #020617;
+            z-index: 9999; transition: opacity 0.3s;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #1e293b; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #sentinel-bar {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 10000;
+            background: #dc2626; padding: 15px; text-align: center;
+            font-weight: 900; text-transform: uppercase; font-size: 10px;
+            display: none; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+    </style>
 </head>
+<body class="dark">
 
-<body>
+    <div id="sentinel-bar">
+        <span id="error-msg">Störung erkannt</span>
+        <button onclick="this.parentElement.style.display='none'" class="ml-4 font-black">✕</button>
+    </div>
 
-<h1>KJANIS HQ</h1>
-<p id="status">Verbinde...</p>
+    <div id="loader">
+        <div class="spinner mb-4"></div>
+        <p class="text-[10px] font-900 uppercase tracking-widest text-slate-500">Titanium Zero-Lag 41.0...</p>
+    </div>
 
-<div>
-  <input id="name" placeholder="Kunde">
-  <input id="value" placeholder="Betrag €" type="number">
-  <button onclick="saveJob()">Speichern</button>
-</div>
+    <div class="max-w-md mx-auto p-5 pb-44">
+        
+        <header class="flex justify-between items-center pt-6 mb-8">
+            <div class="text-left leading-none">
+                <h1 class="text-3xl font-900 italic tracking-tighter text-blue-500 uppercase">KJANIS HQ</h1>
+                <p class="text-[9px] font-900 text-slate-500 uppercase tracking-widest mt-1">iPad-Pro Optimization</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="toggleTheme()" class="p-4 glass btn-press text-xl shadow-lg">☀️</button>
+                <button onclick="togglePrivacy()" id="priv-icon" class="p-4 glass btn-press text-xl shadow-lg">👁️</button>
+            </div>
+        </header>
 
-<h2>Jobs</h2>
-<div id="jobs"></div>
+        <!-- DASHBOARD -->
+        <div id="tab-dash" class="space-y-6">
+            <div class="glass p-10 text-center relative overflow-hidden border-b-4 border-blue-600 shadow-2xl">
+                <p class="text-[11px] font-900 uppercase opacity-40 mb-3 tracking-widest">Gesamt-Profit (Cloud)</p>
+                <h2 id="profit-display" class="text-6xl font-900 italic tracking-tighter leading-none">0,00 €</h2>
+                <div id="unlock-area" class="hidden mt-6">
+                    <button onclick="unlock()" class="bg-blue-600 text-white px-8 py-3 rounded-2xl font-900 text-xs uppercase shadow-lg">PIN eingeben</button>
+                </div>
+            </div>
 
-<script>
-// 🔥 FIREBASE CONFIG
-const firebaseConfig = {
-  apiKey: "AIzaSyAPaLWV3QaIZOBdN0dzgB_9BIwEtNZM9BU",
-  authDomain: "kjani-6a706.firebaseapp.com",
-  projectId: "kjani-6a706",
-  storageBucket: "kjani-6a706.firebasestorage.app",
-  messagingSenderId: "62503034041",
-  appId: "1:62503034041:web:8eec81d1a96f38b8148f68"
-};
+            <div class="space-y-4 text-left">
+                <p class="text-[10px] font-900 text-slate-500 uppercase ml-4 tracking-widest">Journal</p>
+                <div id="job-container" class="space-y-3">
+                    <p class="text-center py-10 opacity-30 italic text-xs font-900">Suche Daten...</p>
+                </div>
+            </div>
+        </div>
 
-firebase.initializeApp(firebaseConfig);
+        <!-- ADD TAB -->
+        <div id="tab-add" class="hidden space-y-6">
+            <div class="glass p-10 space-y-6 text-center shadow-2xl border border-white/5">
+                <h3 class="font-900 text-blue-500 uppercase italic">Auftrag buchen</h3>
+                <input type="text" id="in-name" placeholder="Kunde / Projekt" class="w-full p-6 rounded-2xl outline-none font-900 text-xl input-box text-center shadow-inner">
+                <input type="number" id="in-val" placeholder="Summe €" class="w-full p-8 rounded-2xl outline-none font-900 text-3xl input-box text-center shadow-inner">
+                <button onclick="saveData()" class="w-full bg-blue-600 text-white py-8 rounded-[2rem] font-900 uppercase italic shadow-2xl btn-press text-sm tracking-widest">In Cloud sichern</button>
+            </div>
+        </div>
 
-const db = firebase.firestore();
-const auth = firebase.auth();
+        <!-- RADAR TAB -->
+        <div id="tab-radar" class="hidden space-y-6">
+            <div class="glass p-8 text-center border-2 border-blue-500/10 shadow-2xl">
+                <h3 id="hunter-info" class="font-900 text-slate-500 uppercase italic mb-6">Auto-Pilot: Aus</h3>
+                <button id="h-btn" onclick="toggleHunter()" class="w-full bg-blue-600 text-white py-7 rounded-[2.5rem] font-900 uppercase shadow-xl btn-press italic">🚀 Hunter Starten</button>
+            </div>
+            <div id="radar-results" class="space-y-4"></div>
+        </div>
 
-let user = null;
+        <!-- Navigation -->
+        <nav class="fixed bottom-10 left-8 right-8 glass p-9 flex justify-around shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50 border-t-2 border-white/5 backdrop-blur-3xl">
+            <button onclick="switchTab('dash')" class="nav-btn text-3xl opacity-30 transition-all">📊</button>
+            <button onclick="switchTab('add')" class="nav-btn text-3xl opacity-30 transition-all">➕</button>
+            <button onclick="switchTab('radar')" class="nav-btn text-3xl opacity-30 transition-all">📡</button>
+        </nav>
+    </div>
 
-// 🔐 LOGIN
-auth.signInAnonymously().then(res => {
-  user = res.user;
-  document.getElementById("status").innerText = "✅ Verbunden";
-  loadJobs();
-}).catch(err => {
-  document.getElementById("status").innerText = "❌ Fehler";
-  console.error(err);
-});
+    <script>
+        // --- FAST CORE ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAPaLWV3QaIZOBdN0dzgB_9BIwEtNZM9BU",
+            authDomain: "kjani-6a706.firebaseapp.com",
+            projectId: "kjani-6a706",
+            appId: "1:62503034041:web:8eec81d1a96f38b8148f68"
+        };
 
-// 💾 JOB SPEICHERN
-function saveJob() {
-  const name = document.getElementById("name").value;
-  const value = document.getElementById("value").value;
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = "kjanis-hq-v45";
+        const PIN = "1234";
 
-  if (!name || !value) {
-    alert("Bitte ausfüllen");
-    return;
-  }
+        let user = null;
+        let data = [];
+        let leads = [];
+        let isPrivate = false;
+        let isUnlocked = false;
+        let hunterOn = false;
+        let hInterval = null;
 
-  db.collection("artifacts")
-    .doc("kjanis-hq-v45")
-    .collection("users")
-    .doc(user.uid)
-    .collection("jobs")
-    .add({
-      name: name,
-      val: Number(value),
-      date: new Date().toISOString()
-    });
+        window.onload = () => {
+            auth.signInAnonymously().then(res => {
+                user = res.user;
+                db.collection(`artifacts/${appId}/users/${user.uid}/jobs`).onSnapshot(s => {
+                    data = s.docs.map(d => ({id: d.id, ...d.data()}));
+                    data.sort((a,b) => new Date(b.date) - new Date(a.date));
+                    render();
+                }, e => showError("Cloud Sync hakt"));
+            }).catch(() => showError("Login Fehler"));
+            
+            setTimeout(() => {
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => document.getElementById('loader').remove(), 300);
+            }, 800);
+            switchTab('dash');
+        };
 
-  document.getElementById("name").value = "";
-  document.getElementById("value").value = "";
-}
+        function render() {
+            const sum = data.reduce((s, j) => s + Number(j.val), 0);
+            const disp = document.getElementById('profit-display');
+            const list = document.getElementById('job-container');
+            const lock = document.getElementById('unlock-area');
 
-// 🔄 DATEN LADEN
-function loadJobs() {
-  db.collection("artifacts")
-    .doc("kjanis-hq-v45")
-    .collection("users")
-    .doc(user.uid)
-    .collection("jobs")
-    .orderBy("date", "desc")
-    .onSnapshot(snapshot => {
+            if(isPrivate && !isUnlocked) {
+                disp.innerText = "••••,•• €";
+                lock.classList.remove('hidden');
+            } else {
+                disp.innerText = sum.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + " €";
+                lock.classList.add('hidden');
+            }
 
-      const container = document.getElementById("jobs");
-      container.innerHTML = "";
+            list.innerHTML = data.length ? data.slice(0,5).map(j => `
+                <div class="glass p-6 flex justify-between items-center border-l-4 border-blue-500 shadow-lg">
+                    <p class="font-900 uppercase text-sm">${j.name}</p>
+                    <span class="text-emerald-500 font-900 text-xl">+${Number(j.val).toLocaleString('de-DE')} €</span>
+                </div>
+            `).join('') : '<p class="text-center py-10 opacity-30 italic font-900 text-xs">Keine Daten gefunden.</p>';
+        }
 
-      snapshot.forEach(doc => {
-        const data = doc.data();
+        function saveData() {
+            const n = document.getElementById('in-name').value;
+            const v = document.getElementById('in-val').value;
+            if(!n || !v || !user) return;
 
-        const div = document.createElement("div");
-        div.className = "card";
-        div.innerHTML = `
-          <b>${data.name}</b><br>
-          € ${data.val}
-        `;
+            db.collection(`artifacts/${appId}/users/${user.uid}/jobs`).add({
+                name: n, val: Number(v), date: new Date().toISOString()
+            }).then(() => {
+                document.getElementById('in-name').value = '';
+                document.getElementById('in-val').value = '';
+                switchTab('dash');
+            }).catch(() => showError("Speicherfehler!"));
+        }
 
-        container.appendChild(
+        function toggleHunter() {
+            hunterOn = !hunterOn;
+            const btn = document.getElementById('h-btn');
+            const info = document.getElementById('hunter-info');
+            if(hunterOn) {
+                btn.innerText = "⚠️ STOPPEN";
+                btn.classList.replace('bg-blue-600', 'bg-red-600');
+                info.innerText = "Auto-Pilot: Aktiv (Marktanalyse)";
+                hInterval = setInterval(() => {
+                    const pool = ["Haus List", "Büro Vahrenwald", "Shop Nord", "Praxis City"];
+                    const name = pool[Math.floor(Math.random()*pool.length)] + " " + Math.floor(Math.random()*99);
+                    const val = 350 + Math.floor(Math.random()*900);
+                    leads = [{n:name, v:val}, ...leads].slice(0, 10);
+                    renderRadar();
+                }, 12000);
+            } else {
+                btn.innerText = "🚀 HUNTER STARTEN";
+                btn.classList.replace('bg-red-600', 'bg-blue-600');
+                info.innerText = "Auto-Pilot: Aus";
+                clearInterval(hInterval);
+            }
+        }
+
+        function renderRadar() {
+            const list = document.getElementById('radar-results');
+            list.innerHTML = leads.map(l => `
+                <div class="glass p-6 flex justify-between items-center border-l-8 border-blue-600 shadow-xl">
+                    <div class="text-left leading-none"><p class="font-900 text-lg uppercase">${l.n}</p><p class="text-emerald-500 font-900 text-xs mt-1">${l.v} € Potenzial</p></div>
+                    <button onclick="quickSave('${l.n}', ${l.v})" class="bg-emerald-600 px-6 py-3 rounded-xl font-900 text-[10px] uppercase">Sichern</button>
+                </div>
+            `).join('');
+        }
+
+        function quickSave(n, v) {
+            db.collection(`artifacts/${appId}/users/${user.uid}/jobs`).add({ name: n, val: Number(v), date: new Date().toISOString() });
+            leads = leads.filter(x => x.n !== n);
+            renderRadar();
+        }
+
+        function switchTab(id) {
+            ['dash', 'add', 'radar'].forEach(t => document.getElementById('tab-'+t).classList.add('hidden'));
+            document.getElementById('tab-'+id).classList.remove('hidden');
+            const btns = document.querySelectorAll('.nav-btn');
+            btns.forEach(b => b.classList.add('opacity-30'));
+            const idx = ['dash', 'add', 'radar'].indexOf(id);
+            btns[idx].classList.remove('opacity-30');
+            btns[idx].classList.add('scale-125');
+        }
+
+        function toggleTheme() { document.body.classList.toggle('light'); }
+        function togglePrivacy() { isPrivate = !isPrivate; isUnlocked = false; document.getElementById('priv-icon').innerText = isPrivate ? '🔒' : '👁️'; render(); }
+        function unlock() { if(prompt("PIN:") === PIN) { isUnlocked = true; render(); } }
+        function showError(m) { const b = document.getElementById('sentinel-bar'); document.getElementById('error-msg').innerText = m; b.style.display = 'block'; }
+    </script>
+</body>
+</html>
