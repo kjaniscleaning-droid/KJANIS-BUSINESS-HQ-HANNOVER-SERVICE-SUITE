@@ -1,72 +1,53 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KJANIS HQ | Enterprise V45.0 Final</title>
-    
-    <!-- Enterprise Frameworks (MÜSSEN in dieser Reihenfolge laden) -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KJANIS HQ</title>
 
-    <!-- Firebase SDK (Compat-Version für maximale Stabilität) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #020617; 
-            color: white; 
-            margin: 0; 
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-            overflow-x: hidden;
-            user-select: none;
-        }
-
-        .glass-panel { 
-            background: rgba(15, 23, 42, 0.98); 
-            backdrop-filter: blur(40px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            border-radius: 3rem;
-        }
-
-        .nav-active { 
-            color: #3b82f6; 
-            transform: scale(1.1); 
-            filter: drop-shadow(0 0 15px rgba(59, 130, 246, 0.6)); 
-        }
-
-        .status-dot { width: 8px; height: 8px; border-radius: 999px; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .page-fade { animation: fadeIn 0.4s ease-out; }
-
-        /* iPad Optimierung */
-        button, input, select { min-height: 48px; font-size: 16px !important; }
-        
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white; color: black; }
-            .glass-panel { border: 1px solid #ddd; background: white; color: black; }
-        }
-    </style>
+<style>
+body {
+  background: #020617;
+  color: white;
+  font-family: Arial;
+  text-align: center;
+  padding: 20px;
+}
+input, button {
+  padding: 10px;
+  margin: 10px;
+  width: 80%;
+}
+.card {
+  background: #111827;
+  padding: 15px;
+  margin: 10px;
+  border-radius: 10px;
+}
+</style>
 </head>
+
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+<h1>KJANIS HQ</h1>
+<p id="status">Verbinde...</p>
 
-        // --- KONFIGURATION ---
-        const manualConfig = {
+<div>
+  <input id="name" placeholder="Kunde">
+  <input id="value" placeholder="Betrag €" type="number">
+  <button onclick="saveJob()">Speichern</button>
+</div>
+
+<h2>Jobs</h2>
+<div id="jobs"></div>
+
+<script>
+// 🔥 FIREBASE CONFIG
+const firebaseConfig = {
   apiKey: "AIzaSyAPaLWV3QaIZOBdN0dzgB_9BIwEtNZM9BU",
   authDomain: "kjani-6a706.firebaseapp.com",
   projectId: "kjani-6a706",
@@ -75,238 +56,77 @@
   appId: "1:62503034041:web:8eec81d1a96f38b8148f68"
 };
 
-        let config = null;
-        let bindingMsg = "Kopplung läuft...";
+firebase.initializeApp(firebaseConfig);
 
-        try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                config = JSON.parse(__firebase_config);
-                bindingMsg = "System: Cloud-Binding AKTIV";
-            } else if (manualConfig.apiKey !== "DEIN_API_KEY") {
-                config = manualConfig;
-                bindingMsg = "System: Manuelle Bindung AKTIV";
-            } else {
-                bindingMsg = "System: Demo-Modus (Lokal)";
-            }
-        } catch (e) { bindingMsg = "System: Bindungs-Fehler"; }
+const db = firebase.firestore();
+const auth = firebase.auth();
 
-        const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-hq-v45';
-        
-        if (config && !firebase.apps.length) {
-            firebase.initializeApp(config);
-        }
-        
-        const db = config ? firebase.firestore() : null;
-        const auth = config ? firebase.auth() : null;
+let user = null;
 
-        const HQIcon = ({ name, size = 24, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name, size]);
-            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-        };
+// 🔐 LOGIN
+auth.signInAnonymously().then(res => {
+  user = res.user;
+  document.getElementById("status").innerText = "✅ Verbunden";
+  loadJobs();
+}).catch(err => {
+  document.getElementById("status").innerText = "❌ Fehler";
+  console.error(err);
+});
 
-        const App = () => {
-            const [user, setUser] = useState(null);
-            const [view, setView] = useState('dash');
-            const [privacy, setPrivacy] = useState(true);
-            const [locked, setLocked] = useState(true);
-            const [notif, setNotif] = useState(null);
-            const [jobs, setJobs] = useState([]);
-            const [partners, setPartners] = useState([]);
-            const [form, setForm] = useState({ name: '', val: '', type: 'own', partnerId: '' });
+// 💾 JOB SPEICHERN
+function saveJob() {
+  const name = document.getElementById("name").value;
+  const value = document.getElementById("value").value;
 
-            const MASTER_PIN = "1234";
+  if (!name || !value) {
+    alert("Bitte ausfüllen");
+    return;
+  }
 
-            const notify = (msg) => {
-                setNotif(msg);
-                setTimeout(() => setNotif(null), 3000);
-            };
+  db.collection("artifacts")
+    .doc("kjanis-hq-v45")
+    .collection("users")
+    .doc(user.uid)
+    .collection("jobs")
+    .add({
+      name: name,
+      val: Number(value),
+      date: new Date().toISOString()
+    });
 
-            // Authentication
-            useEffect(() => {
-                if (!auth) return;
-                const unsub = auth.onAuthStateChanged(u => {
-                    if (!u) {
-                        auth.signInAnonymously().catch(console.error);
-                    }
-                    setUser(u);
-                });
-                return () => unsub();
-            }, []);
+  document.getElementById("name").value = "";
+  document.getElementById("value").value = "";
+}
 
-            // Echtzeit Daten-Sync
-            useEffect(() => {
-                if (!user || !db) return;
-                const base = db.collection('artifacts').doc(currentAppId).collection('users').doc(user.uid);
-                
-                const unsubJ = base.collection('jobs').onSnapshot(s => {
-                    const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
-                    list.sort((a, b) => new Date(b.date) - new Date(a.date));
-                    setJobs(list);
-                }, () => notify("Cloud-Sync Fehler"));
+// 🔄 DATEN LADEN
+function loadJobs() {
+  db.collection("artifacts")
+    .doc("kjanis-hq-v45")
+    .collection("users")
+    .doc(user.uid)
+    .collection("jobs")
+    .orderBy("date", "desc")
+    .onSnapshot(snapshot => {
 
-                const unsubP = base.collection('partners').onSnapshot(s => {
-                    setPartners(s.docs.map(d => ({ id: d.id, ...d.data() })));
-                });
+      const container = document.getElementById("jobs");
+      container.innerHTML = "";
 
-                return () => { unsubJ(); unsubP(); };
-            }, [user]);
+      snapshot.forEach(doc => {
+        const data = doc.data();
 
-            const stats = useMemo(() => {
-                let own = 0, prov = 0;
-                jobs.forEach(j => {
-                    const v = Number(j.val) || 0;
-                    if (j.type === 'own') own += v;
-                    else {
-                        const p = partners.find(ptr => ptr.id === j.partnerId);
-                        prov += v * (p ? (Number(p.marge)/100) : 0.3);
-                    }
-                });
-                return { total: own + prov, own, prov };
-            }, [jobs, partners]);
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <b>${data.name}</b><br>
+          € ${data.val}
+        `;
 
-            const saveJob = async () => {
-                if (!form.name || !form.val) return notify("⚠️ Daten prüfen");
-                if (!db || !user) return notify("❌ Nicht gebunden");
-                try {
-                    await db.collection('artifacts').doc(currentAppId).collection('users').doc(user.uid).collection('jobs').add({
-                        ...form, val: Number(form.val), date: new Date().toISOString()
-                    });
-                    setForm({ name: '', val: '', type: 'own', partnerId: '' });
-                    setView('dash');
-                    notify("✅ Buchung online gesichert");
-                } catch (e) { notify("❌ Cloud-Fehler"); }
-            };
+        container.appendChild(div);
+      });
+    });
+}
 
-            const formatEur = (v) => {
-                if (privacy && locked) return "••••,•• €";
-                return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(v || 0);
-            };
+</script>
 
-            if (!user) return (
-                <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center p-12 text-center">
-                    <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-8 shadow-[0_0_20px_rgba(59,130,246,0.3)]"></div>
-                    <p className="text-blue-500 font-black uppercase tracking-[0.4em] text-[10px]">{bindingMsg}</p>
-                </div>
-            );
-
-            return (
-                <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 pb-44 page-fade">
-                    {notif && (
-                        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 px-8 py-3 rounded-2xl font-black text-[10px] uppercase shadow-2xl animate-bounce no-print">
-                            {notif}
-                        </div>
-                    )}
-
-                    <header className="flex justify-between items-center mb-10 mt-4 no-print text-left">
-                        <div className="text-left">
-                            <h1 className="text-3xl font-black italic tracking-tighter uppercase leading-none">
-                                KJANIS <span className="text-blue-500">HQ</span>
-                            </h1>
-                            <div className="flex items-center gap-2 mt-2">
-                                <div className={`status-dot ${db ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                                <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-slate-500">{bindingMsg}</p>
-                            </div>
-                        </div>
-                        <button onClick={() => { setPrivacy(!privacy); if(!privacy) setLocked(true); }} className={`p-4 rounded-3xl transition-all ${privacy ? 'bg-blue-600 shadow-xl' : 'bg-slate-900 border border-white/10 text-slate-500'}`}>
-                            <HQIcon name={privacy ? "lock" : "eye"} size={22} />
-                        </button>
-                    </header>
-
-                    <main className="flex-1 space-y-8">
-                        {view === 'dash' && (
-                            <div className="space-y-6">
-                                <div className="glass-panel p-12 text-center relative overflow-hidden shadow-2xl border-t-2 border-blue-500">
-                                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-6 text-center">Profit (Live)</p>
-                                    <div className="relative h-20 flex items-center justify-center">
-                                        <h2 className={`text-6xl font-black italic tracking-tighter transition-all ${privacy && locked ? 'blur-3xl opacity-10' : ''}`}>
-                                            {formatEur(stats.total)}
-                                        </h2>
-                                        {privacy && locked && (
-                                            <button onClick={() => {
-                                                const p = prompt("MASTER-PIN:");
-                                                if(p === MASTER_PIN) { setLocked(false); notify("🔓 HQ Entsperrt"); }
-                                            }} className="absolute bg-blue-600 px-10 py-4 rounded-3xl font-black text-[11px] uppercase shadow-xl active:scale-95">Entsperren</button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="glass-panel p-6 text-center">
-                                        <p className="text-[8px] text-slate-500 font-bold uppercase mb-2">Eigen</p>
-                                        <p className={`text-emerald-400 font-black text-xl ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.own)}</p>
-                                    </div>
-                                    <div className="glass-panel p-6 text-center">
-                                        <p className="text-[8px] text-slate-500 font-bold uppercase mb-2">Marge</p>
-                                        <p className={`text-blue-400 font-black text-xl ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.prov)}</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4 no-print">
-                                    <p className="text-[10px] font-black uppercase text-slate-600 ml-2 text-left tracking-widest italic">Aktivitäten</p>
-                                    {jobs.slice(0,5).map(j => (
-                                        <div key={j.id} className="glass-panel p-6 flex justify-between items-center animate-in slide-in-from-left">
-                                            <div className="text-left pl-2">
-                                                <span className="font-bold uppercase block tracking-tight text-sm">{j.name}</span>
-                                                <span className="text-[9px] text-slate-500 uppercase mt-1 block tracking-wider font-black italic">Cloud Synced</span>
-                                            </div>
-                                            <div className="flex items-center gap-5">
-                                                <span className={`font-black text-sm ${privacy && locked ? 'blur-sm' : ''}`}>{formatEur(j.val)}</span>
-                                                <button onClick={() => db.collection('artifacts').doc(currentAppId).collection('users').doc(user.uid).collection('jobs').doc(j.id).delete()} className="text-slate-800 hover:text-red-500 p-2"><HQIcon name="trash-2" size={16}/></button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {jobs.length === 0 && <div className="p-12 glass-panel border-dashed border-slate-800 text-center text-slate-700 font-bold uppercase text-[9px] tracking-widest italic">Warte auf Daten...</div>}
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'plus' && (
-                            <div className="glass-panel p-10 space-y-6 text-center no-print animate-in slide-in-from-bottom">
-                                <HQIcon name="plus-circle" size={48} className="mx-auto text-blue-500 mb-2" />
-                                <h3 className="font-black text-blue-500 uppercase italic tracking-wider text-2xl">Buchung</h3>
-                                <div className="space-y-4 text-left">
-                                    <input type="text" placeholder="Kunde" className="w-full bg-[#020617] p-5 rounded-3xl border border-white/5 text-center outline-none focus:border-blue-500/50" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                                    <input type="number" placeholder="Netto €" className="w-full bg-[#020617] p-5 rounded-3xl border border-white/5 text-center outline-none" value={form.val} onChange={e => setForm({...form, val: e.target.value})} />
-                                    <select className="w-full bg-[#020617] p-5 rounded-3xl border border-white/5 text-slate-400 text-sm text-center outline-none" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
-                                        <option value="own">Eigene Leistung (100%)</option>
-                                        <option value="partner">Partner-Deal (Marge)</option>
-                                    </select>
-                                    {form.type === 'partner' && (
-                                        <select className="w-full bg-blue-900/20 p-5 rounded-3xl border border-blue-500/50 text-blue-400 font-bold text-center" value={form.partnerId} onChange={e => setForm({...form, partnerId: e.target.value})}>
-                                            <option value="">Partner wählen...</option>
-                                            {partners.map(p => <option key={p.id} value={p.id}>{p.name} ({p.marge}%)</option>)}
-                                        </select>
-                                    )}
-                                </div>
-                                <button onClick={saveJob} className="w-full bg-blue-600 py-6 rounded-[2.2rem] font-black uppercase text-[12px] tracking-widest active:scale-95 shadow-xl">Sichern</button>
-                            </div>
-                        )}
-
-                        {view === 'radar' && (
-                            <div className="glass-panel p-12 text-center space-y-8 no-print animate-in slide-in-from-right">
-                                <HQIcon name="search" size={56} className="mx-auto text-blue-500" />
-                                <h3 className="font-black text-blue-500 uppercase italic tracking-widest text-3xl text-center">Radar</h3>
-                                <button className="w-full bg-blue-600 py-7 rounded-[2.5rem] font-black text-[12px] uppercase shadow-2xl active:scale-95">Hannover scannen</button>
-                                <p className="text-[12px] text-slate-600 font-black uppercase tracking-[0.2em] leading-relaxed px-6 text-center">KI-Analyse Hannover Nord aktiv. Aktuell keine Leads verfügbar.</p>
-                            </div>
-                        )}
-
-                        {view === 'partners' && (
-                            <div className="space-y-6 no-print">
-                                <div className="glass-panel p-10 text-center space-y-6">
-                                    <HQIcon name="users" size={56} className="mx-auto text-emerald-500" />
-                                    <h3 className="font-black text-emerald-500 uppercase italic tracking-widest text-2xl text-center">Partner</h3>
-                                    <div className="space-y-4">
-                                        <input type="text" placeholder="Firma" id="pn" className="w-full bg-[#020617] p-5 rounded-3xl border border-white/5 text-center" />
-                                        <input type="number" placeholder="Marge %" id="pm" className="w-full bg-[#020617] p-5 rounded-3xl border border-white/5 text-center" />
-                                    </div>
-                                    <button onClick={async () => {
-                                        const n = document.getElementById('pn').value, m = document.getElementById('pm').value;
-                                        if(!n || !m || !db || !user) return notify("⚠️ Daten unvollständig");
-                                        await db.collection('artifacts').doc(currentAppId).collection('users').doc(user.uid).collection('partners').add({ name: n, marge: Number(m), date: new Date().toISOString() });
-                                        document.getElementById('pn').value = ''; document.getElementById('pm').value = ''; 
-                                        notify("🤝 Partner registriert");
-                                    }} className="w-full bg-emerald-600 py-6 rounded-[2.2rem] font-black text-[12px] uppercase active:scale-95 shadow-xl">Listen</button>
-                                </div>
-                                <div className="space-y-3 pb-12">
-                                    {partners.
+</body>
+</html>
