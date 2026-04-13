@@ -1,112 +1,370 @@
-text-slate-500 font-black uppercase mb-1">Eigenleistung</p>
-                <p className="text-emerald-400 font-black text-lg">{formatMoney(stats.own)}</p>
-              </div>
-              <div className="p-6 bg-slate-900/50 border border-white/5 rounded-[2.5rem] text-center">
-                <p className="text-[8px] text-slate-500 font-black uppercase mb-1">Provisionen</p>
-                <p className="text-blue-400 font-black text-lg">{formatMoney(stats.prov)}</p>
-              </div>
-            </div>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KJANIS HQ | Enterprise V31.0</title>
+    
+    <!-- Frameworks: Diese laden die App-Logik direkt im Browser -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-            {/* Drucker-Report (Hidden) */}
-            <div className="hidden">
-              <div ref={printRef} className="p-10 text-black font-serif">
-                <h1 className="text-3xl font-bold border-b-4 border-black pb-4 uppercase italic">Finanzbericht - Kjanis HQ</h1>
-                <p className="mt-4 text-sm font-bold">Datum: {new Date().toLocaleDateString('de-DE')}</p>
-                <div className="mt-10 space-y-4">
-                  <div className="flex justify-between border-b pb-2"><span>Eigene Arbeit:</span> <b>{formatMoney(stats.own)}</b></div>
-                  <div className="flex justify-between border-b pb-2"><span>Provisionen:</span> <b>{formatMoney(stats.prov)}</b></div>
-                  <div className="flex justify-between text-2xl font-black pt-4"><span>Gesamtgewinn:</span> <b>{formatMoney(stats.own + stats.prov)}</b></div>
+    <!-- Firebase Cloud System -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #020617; 
+            color: white; 
+            margin: 0; 
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        .glass-panel { 
+            background: rgba(15, 23, 42, 0.9); 
+            backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            border-radius: 2.5rem;
+        }
+
+        .nav-active { 
+            color: #3b82f6; 
+            transform: scale(1.2); 
+            filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.4)); 
+        }
+
+        .page-fade { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .glass-panel { border: 1px solid #eee; background: white; color: black; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Babel übersetzt den React-Code für das iPad -->
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Firebase Setup
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'kjanis-hq-v31';
+
+        // Icon-Komponente für Lucide
+        const HQIcon = ({ name, size = 24, className = "" }) => {
+            useEffect(() => { 
+                if (window.lucide) window.lucide.createIcons(); 
+            }, [name, size, className]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('dash');
+            const [privacy, setPrivacy] = useState(true);
+            const [locked, setLocked] = useState(true);
+            const [notif, setNotif] = useState(null);
+            const [data, setData] = useState({ jobs: [], partners: [] });
+            const [form, setForm] = useState({ name: '', val: '', type: 'own', partnerId: '' });
+
+            const MASTER_PIN = "1234";
+
+            const notify = (t) => { 
+                setNotif(t); 
+                setTimeout(() => setNotif(null), 3000); 
+            };
+
+            // Authentifizierung
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch (e) { console.error("Cloud-Verbindung fehlgeschlagen", e); }
+                };
+                initAuth();
+                return auth.onAuthStateChanged(setUser);
+            }, []);
+
+            // Echtzeit-Datenabgleich
+            useEffect(() => {
+                if (!user) return;
+                const userPath = db.collection('artifacts').doc(appId).collection('users').doc(user.uid);
+                
+                const unsubPartners = userPath.collection('partners').onSnapshot(s => {
+                    setData(prev => ({ ...prev, partners: s.docs.map(d => ({ id: d.id, ...d.data() })) }));
+                });
+
+                const unsubJobs = userPath.collection('jobs').onSnapshot(s => {
+                    const jobs = s.docs.map(d => ({ id: d.id, ...d.data() }));
+                    jobs.sort((a, b) => new Date(b.date) - new Date(a.date));
+                    setData(prev => ({ ...prev, jobs }));
+                });
+
+                return () => { unsubPartners(); unsubJobs(); };
+            }, [user]);
+
+            // Profit Berechnung
+            const stats = useMemo(() => {
+                let own = 0, prov = 0;
+                data.jobs.forEach(j => {
+                    const v = Number(j.val) || 0;
+                    if (j.type === 'own') own += v;
+                    else {
+                        const p = data.partners.find(ptr => ptr.id === j.partnerId);
+                        prov += v * (p ? (Number(p.marge)/100) : 0.3);
+                    }
+                });
+                return { total: own + prov, own, prov };
+            }, [data]);
+
+            const handleSaveJob = async () => {
+                if (!form.name || !form.val) return notify("⚠️ Daten prüfen!");
+                try {
+                    await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('jobs').add({
+                        ...form, 
+                        val: Number(form.val), 
+                        date: new Date().toISOString()
+                    });
+                    setForm({ name: '', val: '', type: 'own', partnerId: '' });
+                    setView('dash');
+                    notify("✅ Job erfolgreich gebucht");
+                } catch (e) { notify("❌ Fehler beim Speichern"); }
+            };
+
+            const toggleSecurity = () => {
+                if (privacy && !locked) {
+                    setLocked(true);
+                    notify("🔒 System gesperrt");
+                } else {
+                    setPrivacy(!privacy);
+                    setLocked(true);
+                }
+            };
+
+            const unlockSystem = () => {
+                const input = prompt("MASTER-PIN:");
+                if (input === MASTER_PIN) {
+                    setLocked(false);
+                    notify("🔓 Zugriff gewährt");
+                } else if (input !== null) {
+                    notify("❌ PIN falsch");
+                }
+            };
+
+            const formatEur = (v) => {
+                if (privacy && locked) return "••••,•• €";
+                return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(v);
+            };
+
+            if (!user) return (
+                <div className="min-h-screen bg-[#020617] flex flex-col items-center justify-center space-y-4">
+                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-blue-500 font-black uppercase tracking-[0.3em] text-[10px]">Cloud-Verbindung...</p>
                 </div>
-                <p className="mt-20 text-[10px] italic text-gray-400">Generiert via KJANIS HQ Cloud Engine V16</p>
-              </div>
-            </div>
+            );
 
-            <button onClick={handlePrint} className="w-full bg-slate-800/50 py-5 rounded-[2rem] font-black text-[9px] uppercase tracking-widest flex items-center justify-center gap-2 border border-white/5 hover:bg-slate-800 transition-all">
-              <Printer size={14} /> Beleg für Finanzamt drucken
-            </button>
-          </div>
-        )}
+            return (
+                <div className="max-w-md mx-auto min-h-screen flex flex-col p-6 pb-40">
+                    {/* Pop-up Benachrichtigung */}
+                    {notif && (
+                        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-blue-600 px-8 py-3 rounded-2xl font-black text-[10px] tracking-widest uppercase shadow-2xl animate-bounce no-print">
+                            {notif}
+                        </div>
+                    )}
 
-        {/* TAB: BUCHUNG (PLUS) */}
-        {activeTab === 'plus' && (
-           <div className="p-8 bg-slate-900 rounded-[3rem] border border-white/5 space-y-4 animate-in slide-in-from-bottom duration-500 shadow-2xl text-center">
-              <div className="w-12 h-12 bg-blue-600/20 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-2"><Zap size={24}/></div>
-              <h3 className="font-black text-blue-500 uppercase italic">Neue Buchung</h3>
-              <input type="text" placeholder="Kunde / Projekt" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none focus:border-blue-500/50 transition-all" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              <input type="number" placeholder="Brutto-Summe €" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none" value={formData.val} onChange={e => setFormData({...formData, val: e.target.value})} />
-              <select className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-slate-400 text-sm appearance-none text-center" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-                <option value="own">Eigene Arbeit (100%)</option>
-                <option value="partner">Partner-Deal (Marge)</option>
-              </select>
-              {formData.type === 'partner' && (
-                <select className="w-full bg-blue-900/20 p-5 rounded-2xl border border-blue-500/50 outline-none animate-in fade-in text-center" value={formData.partnerId} onChange={e => setFormData({...formData, partnerId: e.target.value})}>
-                  <option value="">Partner wählen...</option>
-                  {partners.map(p => <option key={p.id} value={p.id}>{p.name} ({p.provision}%)</option>)}
-                </select>
-              )}
-              <button onClick={handleSaveJob} className="w-full bg-blue-600 py-6 rounded-[2rem] font-black uppercase text-[11px] tracking-widest shadow-xl active:scale-95 mt-4">Cloud Buchung Bestätigen</button>
-           </div>
-        )}
+                    {/* Header Bereich */}
+                    <header className="flex justify-between items-center mb-10 mt-2 no-print">
+                        <div className="flex flex-col text-left">
+                            <h1 className="text-2xl font-black italic tracking-tighter uppercase leading-none">
+                                KJANIS <span className="text-blue-500">HQ</span>
+                            </h1>
+                            <p className="text-[7px] font-bold uppercase tracking-[0.4em] text-slate-500 mt-2">Enterprise V31.0 // Hyper-Stability</p>
+                        </div>
+                        <button 
+                            onClick={toggleSecurity} 
+                            className={`p-4 rounded-2xl transition-all active:scale-90 ${privacy ? 'bg-blue-600 shadow-xl' : 'bg-slate-900 border border-white/10 text-slate-500'}`}
+                        >
+                            <HQIcon name={privacy ? "lock" : "eye"} size={20} />
+                        </button>
+                    </header>
 
-        {/* TAB: KI-RADAR */}
-        {activeTab === 'radar' && (
-          <div className="space-y-6 animate-in slide-in-from-right duration-500">
-            <div className="p-8 bg-slate-900 border border-white/5 rounded-[3rem] space-y-4 shadow-xl text-center">
-              <h3 className="font-black text-blue-500 uppercase italic flex items-center justify-center gap-2"><Search size={18}/> Markt-Radar</h3>
-              <input type="text" placeholder="Apify Link (JSON URL)" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-[10px] outline-none text-center" value={jsonLink} onChange={e => setJsonLink(e.target.value)} />
-              <button onClick={importLeads} disabled={isScanning} className="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-50">
-                {isScanning ? "KI scannt Hannover..." : "Lead-Import Starten"}
-              </button>
-            </div>
-            <div className="space-y-3">
-              {radarResults.map(lead => (
-                <div key={lead.id} className="p-5 bg-slate-900/50 border border-blue-500/20 rounded-[2rem] flex justify-between items-center group">
-                  <div className="text-left">
-                    <p className="text-[9px] font-black text-blue-500 uppercase">{lead.loc}</p>
-                    <h4 className="text-sm font-black uppercase tracking-tight">{lead.name}</h4>
-                    <p className="text-[10px] font-bold text-emerald-400 mt-1">{formatMoney(lead.val)} Potential</p>
-                  </div>
-                  <button onClick={() => { setFormData({name: lead.name, val: lead.val, type: 'partner'}); setActiveTab('plus'); }} className="bg-blue-600/20 border border-blue-500/30 text-blue-400 px-5 py-3 rounded-xl text-[8px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all">Select</button>
+                    {/* Content Bereich */}
+                    <main className="flex-1 space-y-6 page-fade">
+                        {view === 'dash' && (
+                            <div className="space-y-6">
+                                {/* Profit Card */}
+                                <div className="glass-panel p-10 text-center relative overflow-hidden shadow-2xl border-t-2 border-blue-500/50">
+                                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-4">Gesamt-Profit (Netto)</p>
+                                    <div className="relative h-16 flex items-center justify-center">
+                                        <h2 className={`text-5xl font-black italic tracking-tighter transition-all ${privacy && locked ? 'blur-2xl opacity-10 scale-95' : ''}`}>
+                                            {formatEur(stats.total)}
+                                        </h2>
+                                        {privacy && locked && (
+                                            <button 
+                                                onClick={unlockSystem} 
+                                                className="absolute bg-blue-600 px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-2xl active:scale-95 transition-all"
+                                            >
+                                                System entsperren
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Statistik Grid */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="glass-panel p-6 text-center">
+                                        <p className="text-[7px] text-slate-500 font-bold uppercase mb-1">Eigenarbeit</p>
+                                        <p className={`text-emerald-400 font-black text-lg ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.own)}</p>
+                                    </div>
+                                    <div className="glass-panel p-6 text-center">
+                                        <p className="text-[7px] text-slate-500 font-bold uppercase mb-1">Margen</p>
+                                        <p className={`text-blue-400 font-black text-lg ${privacy && locked ? 'blur-sm opacity-50' : ''}`}>{formatEur(stats.prov)}</p>
+                                    </div>
+                                </div>
+
+                                {/* Auftrags-Historie */}
+                                <div className="space-y-3 no-print">
+                                    <p className="text-[9px] font-black uppercase text-slate-600 ml-2 tracking-widest text-left">Letzte Aktivitäten</p>
+                                    {data.jobs.slice(0,4).map(j => (
+                                        <div key={j.id} className="glass-panel p-5 flex justify-between items-center text-xs group">
+                                            <div className="text-left">
+                                                <span className="font-bold uppercase block tracking-tight">{j.name}</span>
+                                                <span className="text-[8px] text-slate-500 uppercase">{new Date(j.date).toLocaleDateString('de-DE')}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className={`font-black ${privacy && locked ? 'blur-sm' : ''}`}>{formatEur(j.val)}</span>
+                                                <button 
+                                                    onClick={() => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('jobs').doc(j.id).delete()} 
+                                                    className="text-slate-700 hover:text-red-500 transition-all opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <HQIcon name="trash-2" size={14}/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {data.jobs.length === 0 && (
+                                        <div className="py-12 glass-panel border-dashed border-white/5 flex flex-col items-center justify-center text-slate-600">
+                                            <HQIcon name="database" size={24} className="mb-2 opacity-20" />
+                                            <p className="text-[9px] uppercase font-black italic tracking-widest">Keine Daten verfügbar</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button 
+                                    onClick={() => window.print()} 
+                                    className="w-full bg-slate-900 border border-white/5 py-6 rounded-[2.2rem] font-bold text-[10px] uppercase flex justify-center items-center gap-3 active:scale-95 no-print"
+                                >
+                                    <HQIcon name="printer" size={16}/> Dokument drucken
+                                </button>
+                            </div>
+                        )}
+
+                        {view === 'plus' && (
+                            <div className="glass-panel p-10 space-y-5 text-center no-print">
+                                <HQIcon name="zap" size={36} className="mx-auto text-blue-500 mb-2" />
+                                <h3 className="font-black text-blue-500 uppercase italic tracking-wider text-xl">Neue Buchung</h3>
+                                <div className="space-y-4">
+                                    <input type="text" placeholder="Kunde / Projekt" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none focus:border-blue-500/50 transition-all" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                                    <input type="number" placeholder="Brutto-Summe €" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none" value={form.val} onChange={e => setForm({...form, val: e.target.value})} />
+                                    <select className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-slate-400 text-sm text-center outline-none appearance-none" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+                                        <option value="own">Eigene Leistung (100%)</option>
+                                        <option value="partner">Partner-Marge (Provision)</option>
+                                    </select>
+                                    {form.type === 'partner' && (
+                                        <select className="w-full bg-blue-900/20 p-5 rounded-2xl border border-blue-500/50 text-blue-400 font-bold text-center animate-in zoom-in" value={form.partnerId} onChange={e => setForm({...form, partnerId: e.target.value})}>
+                                            <option value="">Partner wählen...</option>
+                                            {data.partners.map(p => <option key={p.id} value={p.id}>{p.name} ({p.marge}%)</option>)}
+                                        </select>
+                                    )}
+                                </div>
+                                <button onClick={handleSaveJob} className="w-full bg-blue-600 py-6 rounded-3xl font-black text-[11px] uppercase shadow-[0_10px_30px_rgba(37,99,235,0.3)] mt-6 active:scale-95 transition-all">
+                                    Jetzt Sichern
+                                </button>
+                            </div>
+                        )}
+
+                        {view === 'radar' && (
+                            <div className="glass-panel p-12 text-center space-y-6 no-print">
+                                <HQIcon name="search" size={44} className="mx-auto text-blue-500" />
+                                <h3 className="font-black text-blue-500 uppercase italic tracking-widest text-xl">Lead-Radar</h3>
+                                <div className="space-y-4">
+                                    <button className="w-full bg-blue-600 py-6 rounded-3xl font-black text-[11px] uppercase shadow-xl active:scale-95">Markt-Scan Hannover</button>
+                                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] leading-relaxed px-4">
+                                        Die KI-Engine analysiert Hannover Nord. Aktuell keine neuen Anfragen im Umkreis von 20km.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'partners' && (
+                            <div className="space-y-6 no-print">
+                                <div className="glass-panel p-10 text-center space-y-6">
+                                    <HQIcon name="users" size={44} className="mx-auto text-emerald-500" />
+                                    <h3 className="font-black text-emerald-500 uppercase italic tracking-widest text-xl">Netzwerk</h3>
+                                    <div className="space-y-3">
+                                        <input type="text" placeholder="Firmenname" id="pn" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none focus:border-emerald-500/50" />
+                                        <input type="number" placeholder="Marge in %" id="pm" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center outline-none" />
+                                    </div>
+                                    <button onClick={async () => {
+                                        const n = document.getElementById('pn').value, m = document.getElementById('pm').value;
+                                        if(!n || !m) return notify("⚠️ Eingabe unvollständig");
+                                        await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('partners').add({name: n, marge: Number(m)});
+                                        document.getElementById('pn').value = ''; document.getElementById('pm').value = ''; 
+                                        notify("🤝 Partner erfolgreich gelistet");
+                                    }} className="w-full bg-emerald-600 py-6 rounded-3xl font-black text-[11px] uppercase shadow-xl active:scale-95">Hinzufügen</button>
+                                </div>
+                                <div className="space-y-2 pb-10">
+                                    <p className="text-[9px] font-black uppercase text-slate-600 ml-2 tracking-widest text-left">Partner-Liste</p>
+                                    {data.partners.map(p => (
+                                        <div key={p.id} className="glass-panel p-6 flex justify-between items-center group animate-in slide-in-from-left">
+                                            <div className="text-left pl-2">
+                                                <p className="text-xs font-black uppercase tracking-tight">{p.name}</p>
+                                                <p className="text-[8px] text-emerald-500 font-bold uppercase tracking-[0.3em]">{p.marge}% Provision</p>
+                                            </div>
+                                            <button onClick={() => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('partners').doc(p.id).delete()} className="text-slate-700 hover:text-red-500 p-2 transition-colors">
+                                                <HQIcon name="trash-2" size={18}/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Navigation im Footer */}
+                    <nav className="fixed bottom-10 left-8 right-8 glass-panel p-8 flex justify-around shadow-[0_25px_60px_rgba(0,0,0,0.6)] z-50 no-print">
+                        <button onClick={() => setView('dash')} className={`transition-all duration-300 ${view === 'dash' ? 'nav-active' : 'text-slate-600'}`}><HQIcon name="trending-up" /></button>
+                        <button onClick={() => setView('plus')} className={`transition-all duration-300 ${view === 'plus' ? 'nav-active' : 'text-slate-600'}`}><HQIcon name="plus-circle" /></button>
+                        <button onClick={() => setView('radar')} className={`transition-all duration-300 ${view === 'radar' ? 'nav-active' : 'text-slate-600'}`}><HQIcon name="radio" /></button>
+                        <button onClick={() => setView('partners')} className={`transition-all duration-300 ${view === 'partners' ? 'nav-active' : 'text-slate-600'}`}><HQIcon name="users" /></button>
+                    </nav>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+            );
+        };
 
-        {/* TAB: PARTNER */}
-        {activeTab === 'partners' && (
-          <div className="space-y-6 animate-in fade-in">
-            <div className="p-8 bg-slate-900 rounded-[3rem] border border-white/5 space-y-4 shadow-xl text-center">
-              <h3 className="font-black text-emerald-500 uppercase italic">Partner registrieren</h3>
-              <input type="text" placeholder="Firma" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center" value={partnerData.name} onChange={e => setPartnerData({...partnerData, name: e.target.value})} />
-              <input type="email" placeholder="E-Mail Kontakt" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center" value={partnerData.email} onChange={e => setPartnerData({...partnerData, email: e.target.value})} />
-              <input type="number" placeholder="Marge / Provision %" className="w-full bg-[#020617] p-5 rounded-2xl border border-white/5 text-center" value={partnerData.provision} onChange={e => setPartnerData({...partnerData, provision: e.target.value})} />
-              <button onClick={handleAddPartner} className="w-full bg-emerald-600 py-6 rounded-[2rem] font-black uppercase text-[10px] tracking-widest text-center">Netzwerk hinzufügen</button>
-            </div>
-            <div className="space-y-2">
-                {partners.map(p => (
-                   <div key={p.id} className="p-4 bg-slate-900/40 border border-white/5 rounded-2xl flex justify-between items-center animate-in slide-in-from-left">
-                      <div className="text-left pl-2">
-                        <p className="text-[10px] font-black uppercase tracking-tight">{p.name}</p>
-                        <p className="text-[8px] text-slate-500 font-bold">{p.email} • {p.provision}% Marge</p>
-                      </div>
-                      <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'partners', p.id))} className="text-slate-700 hover:text-red-500 transition-colors p-3"><Trash2 size={16} /></button>
-                   </div>
-                ))}
-            </div>
-          </div>
-        )}
-      </main>
-
-      {/* FOOTER NAV */}
-      <nav className="fixed bottom-10 left-8 right-8 bg-slate-900/90 backdrop-blur-3xl border border-white/5 rounded-[3rem] p-8 flex justify-around shadow-2xl z-50">
-        <button onClick={() => setActiveTab('dash')} className={`transition-all duration-300 ${activeTab === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconStats /></button>
-        <button onClick={() => setActiveTab('plus')} className={`transition-all duration-300 ${activeTab === 'plus' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconPlus /></button>
-        <button onClick={() => setActiveTab('radar')} className={`transition-all duration-300 ${activeTab === 'radar' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconRadar /></button>
-        <button onClick={() => setActiveTab('partners')} className={`transition-all duration-300 ${activeTab === 'partners' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}><IconPartner /></button>
-      </nav>
-    </div>
-  );
-};
-
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
