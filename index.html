@@ -6,22 +6,17 @@
   <title>KJANIS HQ</title>
 
   <!-- React & Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
-  <!-- Firebase SDK -->
+  <!-- Firebase -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    // 🔹 ERSETZE MIT DEINEN ECHTEN FIREBASE-DATEN
     const firebaseConfig = {
       apiKey: "DEIN_API_KEY",
       authDomain: "DEIN_PROJEKT.firebaseapp.com",
@@ -35,6 +30,7 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // Global verfügbar machen
     window.firebaseServices = {
       auth,
       db,
@@ -42,9 +38,7 @@
       onAuthStateChanged,
       collection,
       addDoc,
-      onSnapshot,
-      deleteDoc,
-      doc
+      onSnapshot
     };
   </script>
 
@@ -54,26 +48,18 @@
       background: #020617;
       color: white;
       font-family: Arial, sans-serif;
+      text-align: center;
+      padding-top: 50px;
     }
-
-    .loader {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-
     .spinner {
       width: 60px;
       height: 60px;
-      border: 5px solid #1e3a8a;
-      border-top: 5px solid #3b82f6;
+      border: 6px solid #1e3a8a;
+      border-top: 6px solid #3b82f6;
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin-bottom: 20px;
+      margin: 20px auto;
     }
-
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
@@ -86,97 +72,45 @@
     const { useState, useEffect } = React;
     const {
       auth,
-      db,
       signInAnonymously,
-      onAuthStateChanged,
-      collection,
-      addDoc,
-      onSnapshot,
-      deleteDoc,
-      doc
+      onAuthStateChanged
     } = window.firebaseServices;
 
     const App = () => {
       const [user, setUser] = useState(null);
-      const [jobs, setJobs] = useState([]);
-      const [name, setName] = useState("");
-      const [value, setValue] = useState("");
+      const [error, setError] = useState(null);
 
-      // Authentifizierung
       useEffect(() => {
-        signInAnonymously(auth).catch(console.error);
-        const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-        return unsub;
+        signInAnonymously(auth)
+          .catch((err) => {
+            console.error(err);
+            setError(err.message);
+          });
+
+        const unsub = onAuthStateChanged(auth, (u) => {
+          setUser(u);
+        });
+
+        return () => unsub();
       }, []);
 
-      // Daten laden
-      useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(collection(db, "jobs"), (snapshot) => {
-          setJobs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-        return unsub;
-      }, [user]);
+      if (error) {
+        return <h2>❌ Fehler: {error}</h2>;
+      }
 
       if (!user) {
         return (
-          <div className="loader">
+          <div>
             <div className="spinner"></div>
             <p>Cloud-Verbindung wird aufgebaut...</p>
           </div>
         );
       }
 
-      const addJob = async () => {
-        if (!name || !value) return;
-        await addDoc(collection(db, "jobs"), {
-          name,
-          val: Number(value),
-          date: new Date().toISOString()
-        });
-        setName("");
-        setValue("");
-      };
-
       return (
-        <div className="max-w-md mx-auto p-6">
-          <h1 className="text-3xl font-bold text-blue-500 mb-6">KJANIS HQ</h1>
-
-          <div className="space-y-3 mb-6">
-            <input
-              className="w-full p-3 rounded text-black"
-              placeholder="Projektname"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              className="w-full p-3 rounded text-black"
-              type="number"
-              placeholder="Betrag €"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-            />
-            <button
-              onClick={addJob}
-              className="w-full bg-blue-600 p-3 rounded font-bold"
-            >
-              Speichern
-            </button>
-          </div>
-
-          <div className="space-y-2">
-            {jobs.map(job => (
-              <div key={job.id} className="bg-slate-800 p-3 rounded flex justify-between">
-                <span>{job.name} - {job.val} €</span>
-                <button
-                  onClick={() => deleteDoc(doc(db, "jobs", job.id))}
-                  className="text-red-400"
-                >
-                  Löschen
-                </button>
-              </div>
-            ))}
-          </div>
+        <div>
+          <h1>✅ Verbindung erfolgreich!</h1>
+          <p>User ID: {user.uid}</p>
         </div>
       );
     };
