@@ -1,108 +1,140 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kjani App</title>
-
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>KJANI RADAR PRO</title>
+    <style>
+        :root {
+            --bg: #05070a;
+            --blue: #3b82f6;
+            --card: #111827;
+            --text: #ffffff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, system-ui, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        .header { text-align: center; margin: 40px 0; }
+        h1 { color: var(--blue); font-size: clamp(24px, 8vw, 36px); font-weight: 900; font-style: italic; text-transform: uppercase; margin: 0; letter-spacing: -1px; }
+        .subtitle { font-size: 10px; letter-spacing: 4px; color: #4b5563; text-transform: uppercase; margin-top: 5px; }
+        .main-card {
+            background: var(--card);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 30px;
+            padding: 25px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        .scan-btn {
+            background: var(--blue);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 20px;
+            border-radius: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(59, 130, 246, 0.2);
+            -webkit-appearance: none;
+            transition: background 0.2s;
+        }
+        .scan-btn:active { transform: scale(0.98); background: #2563eb; }
+        .scan-btn:disabled { background: #1e293b; color: #475569; }
+        
+        #results {
+            margin-top: 25px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 20px;
+            padding: 20px;
+            display: none;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid rgba(255,255,255,0.05);
+            white-space: pre-wrap;
+            color: #cbd5e1;
+        }
+        .loader {
+            display: none;
+            margin-top: 15px;
+            color: var(--blue);
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+    </style>
 </head>
+<body>
 
-<body class="bg-black text-white">
-<div id="root"></div>
-
-<script type="text/babel">
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAPaLWV3QaIZOBdN0dzgB_9BIwEtNZM9BU",
-  authDomain: "kjani-6a706.firebaseapp.com",
-  projectId: "kjani-6a706",
-  storageBucket: "kjani-6a706.firebasestorage.app",
-  messagingSenderId: "62503034041",
-  appId: "1:62503034041:web:e8ec81d1a96f38b8148f68"
-};
-
-firebase.initializeApp(firebaseConfig);
-
-const auth = firebase.auth();
-const db = firebase.firestore();
-
-function App() {
-  const [jobs, setJobs] = React.useState([]);
-  const [user, setUser] = React.useState(null);
-
-  React.useEffect(() => {
-    auth.signInAnonymously();
-
-    auth.onAuthStateChanged(u => {
-      setUser(u);
-
-      if (u) {
-        db.collection("jobs")
-          .orderBy("created", "desc")
-          .onSnapshot(snapshot => {
-            const data = snapshot.docs.map(doc => ({
-              id: doc.id,
-              ...doc.data()
-            }));
-            setJobs(data);
-          });
-      }
-    });
-  }, []);
-
-  const addJob = async () => {
-    const name = prompt("Kunde?");
-    const phone = prompt("Telefon?");
-    const job = prompt("Was machen?");
-
-    if (!name || !phone) return;
-
-    await db.collection("jobs").add({
-      name,
-      phone,
-      job,
-      created: new Date()
-    });
-  };
-
-  return (
-    <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold mb-4">📱 Kjani Aufträge</h1>
-
-      <button 
-        onClick={addJob}
-        className="bg-blue-600 p-4 rounded-xl w-full mb-4"
-      >
-        ➕ Auftrag hinzufügen
-      </button>
-
-      {jobs.map(job => (
-        <div key={job.id} className="bg-gray-800 p-4 mb-3 rounded-xl">
-          <p className="font-bold">{job.name}</p>
-          <p>{job.job}</p>
-          <p>{job.phone}</p>
-
-          <a 
-            href={`tel:${job.phone}`} 
-            className="block bg-green-600 mt-3 p-3 text-center rounded-xl"
-          >
-            📞 Anrufen
-          </a>
-        </div>
-      ))}
+    <div class="header">
+        <h1>KJANI RADAR</h1>
+        <div class="subtitle">Sektor Hannover</div>
     </div>
-  );
-}
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    <div class="main-card">
+        <button id="scanBtn" class="scan-btn" onclick="startScan()">Radar Starten</button>
+        <div id="loader" class="loader">Scanner wird kalibriert...</div>
+        <div id="results"></div>
+    </div>
 
-</script>
-</
+    <script>
+        async function startScan() {
+            const btn = document.getElementById('scanBtn');
+            const loader = document.getElementById('loader');
+            const out = document.getElementById('results');
+            // API Schlüssel für Hannover Scanner
+            const apiKey = "AIzaSyC9ZXRbkyoXTBeYtO8JaV78Uw-fPZQ92rU";
+
+            btn.disabled = true;
+            btn.innerText = "SCAN LÄUFT...";
+            loader.style.display = "block";
+            out.style.display = "none";
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: "Nenne 5 echte Reinigungsaufträge, Firmen oder aktuelle Ausschreibungen in Hannover. Bitte mit Stadtteil, Art der Reinigung (z.B. Büro, Glas, Bau) und Name der Firma oder Ansprechpartner."
+                            }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Radar gestört. Bitte versuche es in einer Minute nochmal.";
+                
+                out.innerText = text;
+                out.style.display = "block";
+            } catch (err) {
+                out.innerText = "VERBINDUNGSFEHLER: Check dein Internet, Boss!";
+                out.style.display = "block";
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Radar Starten";
+                loader.style.display = "none";
+            }
+        }
+    </script>
+
+</body>
+</html>
