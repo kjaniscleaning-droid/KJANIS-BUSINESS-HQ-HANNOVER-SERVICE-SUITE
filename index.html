@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Ilirya Business System</title>
+<title>Ilirya Business System PRO</title>
 
 <style>
 body {
@@ -22,7 +22,6 @@ body {
   padding: 15px;
   margin-bottom: 15px;
   border-radius: 10px;
-  transition: 0.3s;
 }
 
 .dark .card {
@@ -40,7 +39,7 @@ button {
   font-weight: bold;
 }
 
-textarea, input {
+textarea, input, select {
   width: 100%;
   padding: 10px;
   margin-top: 5px;
@@ -48,14 +47,22 @@ textarea, input {
 
 .item {
   padding: 10px;
-  background:#eef2f7;
   margin-top:10px;
   border-radius:8px;
+  background:#eef2f7;
+}
+
+.dark .item {
+  background:#334155;
+}
+
+.status {
+  font-size: 12px;
+  margin-top: 5px;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 20px;
 }
 
 .eagle {
@@ -67,69 +74,87 @@ textarea, input {
 <body>
 
 <div class="header">
-  <div class="eagle">🦅</div>
-  <h2>Ilirya Business System</h2>
+  <div class="eagle">🦅 Ilirya</div>
+  <h2>Business System PRO</h2>
   <button onclick="toggleMode()">💡 Licht an / aus</button>
 </div>
 
+<!-- 🔍 SUCHEN -->
 <div class="card">
 <h3>🔍 Kunden finden</h3>
 <button onclick="search('Hausverwaltung Hannover')">Hausverwaltung</button>
 <button onclick="search('Immobilien Hannover')">Immobilien</button>
-<button onclick="search('Büro Hannover')">Büros</button>
+<button onclick="search('Büro Reinigung Hannover')">Büros</button>
 <button onclick="search('Arztpraxis Hannover')">Praxen</button>
 </div>
 
+<!-- 📩 ANSCHREIBEN -->
 <div class="card">
 <h3>📩 Firma anschreiben</h3>
+
 <input id="firma" placeholder="Firma eingeben">
-<button onclick="generate()">🔥 Angebot erstellen</button>
-<textarea id="text" rows="10"></textarea>
+<input id="email" placeholder="E-Mail einfügen">
+
+<button onclick="generate()">🔥 Starkes Angebot erstellen</button>
+
+<textarea id="text" rows="12"></textarea>
+
 <button onclick="sendMail()">📧 Email öffnen</button>
 <button onclick="saveFirma()">💾 Speichern</button>
 </div>
 
+<!-- 📋 LISTE -->
 <div class="card">
-<h3>📋 Firmen Übersicht</h3>
+<h3>📋 Firmen + Status</h3>
 <div id="liste"></div>
 </div>
 
+<!-- 🤖 ANTWORT -->
 <div class="card">
 <h3>🤖 Antwort Hilfe</h3>
+
 <input id="frage" placeholder="Kundenfrage eingeben">
 <button onclick="generateAnswer()">Antwort erstellen</button>
-<textarea id="antwort" rows="8"></textarea>
+
+<textarea id="antwort"></textarea>
 <button onclick="sendAnswer()">📤 Antwort senden</button>
 </div>
 
 <script>
 
+// DARK MODE
 function toggleMode() {
   document.body.classList.toggle("dark");
 }
 
-function search(query) {
-  window.open("https://www.google.com/search?q=" + encodeURIComponent(query));
+// GOOGLE SUCHE
+function search(q){
+  window.open("https://www.google.com/search?q=" + encodeURIComponent(q));
 }
 
-function generate() {
+// STARKE NACHRICHT
+function generate(){
   let firma = document.getElementById("firma").value;
 
   let text = `Betreff: Zusammenarbeit im Bereich Reinigung
 
 Guten Tag ${firma},
 
-mein Name ist Kjani Zharki von Kjanis Cleaning aus Hannover.
+mein Name ist Kjani Zharki, Inhaber von Kjanis Cleaning aus Hannover.
 
-Ich unterstütze Unternehmen zuverlässig bei:
+Ich unterstütze Hausverwaltungen und Unternehmen zuverlässig bei:
 
 • Treppenhausreinigung  
 • Büroreinigung  
 • Unterhaltsreinigung  
 
-Aktuell habe ich freie Kapazitäten und kann kurzfristig starten.
+Aktuell habe ich freie Kapazitäten und kann kurzfristig Objekte übernehmen.
 
-Ich arbeite sauber, zuverlässig und langfristig.
+Ich arbeite strukturiert, sauber und lege großen Wert auf Qualität und Zuverlässigkeit – genau das, was im täglichen Betrieb wichtig ist.
+
+Gerne biete ich Ihnen an, eines Ihrer Objekte zu betreuen und Sie im Bereich Reinigung zu entlasten.
+
+Ich kann mir das Objekt kurzfristig ansehen und Ihnen ein passendes Angebot erstellen.
 
 📞 +49 152 15787871
 
@@ -142,46 +167,91 @@ Kjanis Cleaning`;
   document.getElementById("text").value = text;
 }
 
-function sendMail() {
+// EMAIL SENDEN
+function sendMail(){
+  let email = document.getElementById("email").value;
   let body = document.getElementById("text").value;
-  window.location.href = "mailto:?subject=Reinigung Angebot&body=" + encodeURIComponent(body);
+
+  window.location.href =
+  "mailto:" + email +
+  "?subject=Zusammenarbeit Reinigung&body=" +
+  encodeURIComponent(body);
 }
 
+// SPEICHERN + STATUS
 let firmen = JSON.parse(localStorage.getItem("firmen")) || [];
 
-function saveFirma() {
+function saveFirma(){
   let name = document.getElementById("firma").value;
-  if (!name || firmen.includes(name)) return;
 
-  firmen.push(name);
+  if(!name) return;
+
+  let exists = firmen.find(f => f.name === name);
+  if(exists) return;
+
+  firmen.push({
+    name: name,
+    status: "Gesendet",
+    date: new Date().getTime()
+  });
+
   localStorage.setItem("firmen", JSON.stringify(firmen));
   render();
 }
 
-function render() {
+// LISTE + FOLLOW UP
+function render(){
   let box = document.getElementById("liste");
   box.innerHTML = "";
-  firmen.forEach(f => {
-    box.innerHTML += `<div class="item">${f}</div>`;
+
+  firmen.forEach((f,i)=>{
+    let days = (new Date().getTime() - f.date) / (1000*60*60*24);
+
+    let reminder = "";
+    if(days >= 2 && f.status === "Gesendet"){
+      reminder = "⚠️ Nachfassen!";
+    }
+
+    box.innerHTML += `
+      <div class="item">
+        <b>${f.name}</b><br>
+        <span class="status">Status: ${f.status}</span><br>
+        <span>${reminder}</span>
+        <button onclick="updateStatus(${i})">Antwort erhalten</button>
+      </div>
+    `;
   });
 }
 
-function generateAnswer() {
+// STATUS ÄNDERN
+function updateStatus(i){
+  firmen[i].status = "Antwort";
+  localStorage.setItem("firmen", JSON.stringify(firmen));
+  render();
+}
+
+// ANTWORT SYSTEM
+function generateAnswer(){
   let frage = document.getElementById("frage").value.toLowerCase();
   let text = "";
 
-  if (frage.includes("preis")) {
-    text = "Die Kosten hängen vom Objekt ab. Gerne besichtige ich alles und mache Ihnen ein Angebot.";
-  } else if (frage.includes("wann")) {
+  if(frage.includes("preis")){
+    text = "Die Kosten hängen vom Objekt ab. Gerne besichtige ich alles und mache Ihnen ein faires Angebot.";
+  }
+  else if(frage.includes("wann")){
     text = "Ich habe aktuell freie Kapazitäten und kann kurzfristig starten.";
-  } else {
+  }
+  else if(frage.includes("erfahrung")){
+    text = "Ich arbeite sehr zuverlässig, sauber und strukturiert. Qualität und langfristige Zusammenarbeit stehen bei mir im Fokus.";
+  }
+  else{
     text = "Vielen Dank für Ihre Nachricht. Gerne bespreche ich alles persönlich mit Ihnen.";
   }
 
   document.getElementById("antwort").value = text;
 }
 
-function sendAnswer() {
+function sendAnswer(){
   let body = document.getElementById("antwort").value;
   window.location.href = "mailto:?subject=Antwort&body=" + encodeURIComponent(body);
 }
