@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Kjanis Business V2</title>
+<title>Kjanis AI System</title>
 
 <style>
 body {
@@ -24,7 +24,7 @@ h2 {
   color: #1e3a8a;
 }
 
-input {
+input, textarea {
   width: 100%;
   padding: 12px;
   margin-bottom: 10px;
@@ -41,12 +41,12 @@ button {
   border: none;
   border-radius: 8px;
   font-weight: bold;
-  font-size: 16px;
+  margin-top: 5px;
 }
 
 .item {
   background: #f1f5f9;
-  padding: 12px;
+  padding: 10px;
   margin-top: 10px;
   border-radius: 8px;
   border-left: 5px solid #d4af37;
@@ -57,34 +57,49 @@ button {
 <body>
 
 <div class="card">
-  <h2>💼 Kjanis Business</h2>
+  <h2>🤖 Kjanis Business AI</h2>
 </div>
 
 <div class="card">
-  <input id="name" placeholder="Kunde / Auftrag">
-  <input id="price" placeholder="Betrag €">
-  <button onclick="save()">Speichern</button>
+  <input id="firma" placeholder="Firma (z.B. Hausverwaltung Müller)">
+  <input id="branche" placeholder="Art (z.B. Treppenhaus, Büro)">
+  <button onclick="generate()">✨ Nachricht generieren</button>
 </div>
 
 <div class="card">
-  <h3>📋 Aufträge</h3>
+  <h3>📩 Nachricht (bearbeiten erlaubt)</h3>
+  <textarea id="message" rows="8"></textarea>
+  <button onclick="openMail()">📧 Email öffnen</button>
+</div>
+
+<div class="card">
+  <h3>📋 Gespeicherte Kontakte</h3>
   <div id="list"></div>
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("data")) || [];
+let data = JSON.parse(localStorage.getItem("firmen")) || [];
 
-function save() {
-  let name = document.getElementById("name").value;
-  let price = document.getElementById("price").value;
+function generate() {
+  let firma = document.getElementById("firma").value;
+  let branche = document.getElementById("branche").value;
 
-  if (!name || !price) return;
+  if (!firma) return;
 
-  data.push({ name, price });
-  localStorage.setItem("data", JSON.stringify(data));
+  let text = `Hallo ${firma},
 
-  document.getElementById("name").value = "";
-  document.getElementById("price").value = "";
+ich biete professionelle Reinigung in Hannover an (${branche}).
+
+Aktuell habe ich freie Kapazitäten und kann kurzfristig starten.
+
+Gerne erstelle ich Ihnen ein unverbindliches Angebot.
+
+Viele Grüße`;
+
+  document.getElementById("message").value = text;
+
+  data.push({ firma, branche });
+  localStorage.setItem("firmen", JSON.stringify(data));
 
   render();
 }
@@ -96,11 +111,16 @@ function render() {
   data.forEach(d => {
     list.innerHTML += `
       <div class="item">
-        <b>${d.name}</b><br>
-        ${d.price} €
+        <b>${d.firma}</b><br>
+        ${d.branche}
       </div>
     `;
   });
+}
+
+function openMail() {
+  let text = document.getElementById("message").value;
+  window.location.href = "mailto:?subject=Reinigung Angebot&body=" + encodeURIComponent(text);
 }
 
 render();
