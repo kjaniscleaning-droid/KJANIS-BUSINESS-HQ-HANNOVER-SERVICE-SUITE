@@ -2,13 +2,12 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Kjanis AI System</title>
+<title>Kjanis Business Pro</title>
 
 <style>
 body {
   font-family: Arial;
   background: #f8fafc;
-  color: #0f172a;
   padding: 15px;
 }
 
@@ -17,39 +16,25 @@ body {
   padding: 15px;
   border-radius: 12px;
   margin-bottom: 15px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-}
-
-h2 {
-  color: #1e3a8a;
 }
 
 input, textarea {
   width: 100%;
   padding: 12px;
-  margin-bottom: 10px;
+  margin-top: 10px;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
-  font-size: 16px;
 }
 
 button {
   width: 100%;
   padding: 12px;
-  background: linear-gradient(90deg, #1e3a8a, #d4af37);
+  background: linear-gradient(90deg,#1e3a8a,#d4af37);
   color: white;
   border: none;
-  border-radius: 8px;
-  font-weight: bold;
-  margin-top: 5px;
-}
-
-.item {
-  background: #f1f5f9;
-  padding: 10px;
   margin-top: 10px;
   border-radius: 8px;
-  border-left: 5px solid #d4af37;
+  font-weight: bold;
 }
 </style>
 </head>
@@ -57,74 +42,134 @@ button {
 <body>
 
 <div class="card">
-  <h2>🤖 Kjanis Business AI</h2>
+  <h2>💼 Kjanis Business Pro</h2>
 </div>
 
+<!-- ANSCHREIBEN -->
 <div class="card">
+  <h3>📩 Firma anschreiben</h3>
   <input id="firma" placeholder="Firma (z.B. Hausverwaltung Müller)">
-  <input id="branche" placeholder="Art (z.B. Treppenhaus, Büro)">
-  <button onclick="generate()">✨ Nachricht generieren</button>
+  <button onclick="generateMessage()">🔥 Starkes Angebot erstellen</button>
 </div>
 
 <div class="card">
-  <h3>📩 Nachricht (bearbeiten erlaubt)</h3>
-  <textarea id="message" rows="8"></textarea>
-  <button onclick="openMail()">📧 Email öffnen</button>
+  <textarea id="message" rows="10"></textarea>
+  <button onclick="sendMail()">📧 Email öffnen</button>
+</div>
+
+<!-- ANTWORT SYSTEM -->
+<div class="card">
+  <h3>🤖 Kunden Antwort</h3>
+  <input id="frage" placeholder="Kundenfrage eingeben">
+  <button onclick="generateAnswer()">Antwort generieren</button>
 </div>
 
 <div class="card">
-  <h3>📋 Gespeicherte Kontakte</h3>
-  <div id="list"></div>
+  <textarea id="antwort" rows="8"></textarea>
+  <button onclick="sendAnswer()">📤 Antwort senden</button>
 </div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("firmen")) || [];
 
-function generate() {
+// STARKE NACHRICHT
+function generateMessage() {
   let firma = document.getElementById("firma").value;
-  let branche = document.getElementById("branche").value;
 
-  if (!firma) return;
+  let text = `Betreff: Zusammenarbeit im Bereich Reinigung
 
-  let text = `Hallo ${firma},
+Guten Tag ${firma},
 
-ich biete professionelle Reinigung in Hannover an (${branche}).
+mein Name ist Kjani Zharki, Inhaber von Kjanis Cleaning aus Hannover.
 
-Aktuell habe ich freie Kapazitäten und kann kurzfristig starten.
+Ich unterstütze Hausverwaltungen und Immobilienfirmen zuverlässig bei der Treppenhaus- und Büroreinigung.
 
-Gerne erstelle ich Ihnen ein unverbindliches Angebot.
+Aktuell habe ich freie Kapazitäten und kann kurzfristig Objekte übernehmen.
 
-Viele Grüße`;
+Ich arbeite strukturiert, sauber und lege großen Wert auf Zuverlässigkeit und langfristige Zusammenarbeit – genau das, was im täglichen Betrieb wichtig ist.
+
+Gerne würde ich Ihnen anbieten, eines Ihrer Objekte zu betreuen und Sie im Bereich Reinigung zu entlasten.
+
+Ich kann mir das Objekt kurzfristig ansehen und Ihnen ein passendes Angebot erstellen.
+
+Sie erreichen mich jederzeit unter:
+📞 +49 152 15787871
+
+Ich freue mich auf Ihre Rückmeldung.
+
+Mit freundlichen Grüßen  
+Kjani Zharki  
+Kjanis Cleaning`;
 
   document.getElementById("message").value = text;
-
-  data.push({ firma, branche });
-  localStorage.setItem("firmen", JSON.stringify(data));
-
-  render();
 }
 
-function render() {
-  let list = document.getElementById("list");
-  list.innerHTML = "";
-
-  data.forEach(d => {
-    list.innerHTML += `
-      <div class="item">
-        <b>${d.firma}</b><br>
-        ${d.branche}
-      </div>
-    `;
-  });
-}
-
-function openMail() {
+// EMAIL SENDEN
+function sendMail() {
   let text = document.getElementById("message").value;
   window.location.href = "mailto:?subject=Reinigung Angebot&body=" + encodeURIComponent(text);
 }
 
-render();
+// ANTWORT SYSTEM
+function generateAnswer() {
+  let frage = document.getElementById("frage").value.toLowerCase();
+  let text = "";
+
+  if (frage.includes("preis") || frage.includes("kosten")) {
+    text = `Vielen Dank für Ihre Anfrage.
+
+Die Kosten hängen vom Objekt, Größe und Aufwand ab.
+
+Gerne besichtige ich alles kurz und erstelle Ihnen ein faires Angebot.
+
+Mit freundlichen Grüßen  
+Kjani Zharki  
+Kjanis Cleaning`;
+  }
+
+  else if (frage.includes("wann") || frage.includes("start")) {
+    text = `Vielen Dank für Ihre Anfrage.
+
+Ich habe aktuell freie Kapazitäten und kann kurzfristig starten.
+
+Mit freundlichen Grüßen  
+Kjani Zharki  
+Kjanis Cleaning`;
+  }
+
+  else if (frage.includes("erfahrung")) {
+    text = `Vielen Dank für Ihre Anfrage.
+
+Ich arbeite sehr zuverlässig, gründlich und lege großen Wert auf Qualität.
+
+Mein Ziel ist eine langfristige und saubere Zusammenarbeit.
+
+Mit freundlichen Grüßen  
+Kjani Zharki  
+Kjanis Cleaning`;
+  }
+
+  else {
+    text = `Vielen Dank für Ihre Nachricht.
+
+Gerne unterstütze ich Sie bei Ihrem Anliegen.
+
+Ich schlage vor, wir vereinbaren einen kurzen Termin zur Besichtigung.
+
+Mit freundlichen Grüßen  
+Kjani Zharki  
+Kjanis Cleaning`;
+  }
+
+  document.getElementById("antwort").value = text;
+}
+
+// ANTWORT SENDEN
+function sendAnswer() {
+  let text = document.getElementById("antwort").value;
+  window.location.href = "mailto:?subject=Antwort&body=" + encodeURIComponent(text);
+}
+
 </script>
 
 </body>
-</
+</html>
