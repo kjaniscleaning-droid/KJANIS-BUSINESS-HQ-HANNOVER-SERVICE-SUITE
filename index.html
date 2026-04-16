@@ -2,45 +2,54 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Kjanis App</title>
+<title>Kjanis Business V2</title>
 
 <style>
 body {
   font-family: Arial;
-  background: #0f172a;
-  color: white;
+  background: #f8fafc;
+  color: #0f172a;
   padding: 15px;
 }
 
 .card {
-  background: #1e293b;
+  background: white;
   padding: 15px;
-  border-radius: 10px;
+  border-radius: 12px;
   margin-bottom: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+}
+
+h2 {
+  color: #1e3a8a;
 }
 
 input {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 10px;
   border-radius: 8px;
-  border: none;
+  border: 1px solid #cbd5e1;
+  font-size: 16px;
 }
 
 button {
   width: 100%;
-  padding: 10px;
-  background: #22c55e;
+  padding: 12px;
+  background: linear-gradient(90deg, #1e3a8a, #d4af37);
+  color: white;
   border: none;
   border-radius: 8px;
   font-weight: bold;
+  font-size: 16px;
 }
 
 .item {
-  background: #334155;
-  padding: 10px;
+  background: #f1f5f9;
+  padding: 12px;
   margin-top: 10px;
   border-radius: 8px;
+  border-left: 5px solid #d4af37;
 }
 </style>
 </head>
@@ -48,11 +57,11 @@ button {
 <body>
 
 <div class="card">
-  <h2>📱 Kjanis App</h2>
+  <h2>💼 Kjanis Business</h2>
 </div>
 
 <div class="card">
-  <input id="name" placeholder="Kunde">
+  <input id="name" placeholder="Kunde / Auftrag">
   <input id="price" placeholder="Betrag €">
   <button onclick="save()">Speichern</button>
 </div>
@@ -87,7 +96,8 @@ function render() {
   data.forEach(d => {
     list.innerHTML += `
       <div class="item">
-        ${d.name} – ${d.price} €
+        <b>${d.name}</b><br>
+        ${d.price} €
       </div>
     `;
   });
