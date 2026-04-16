@@ -1,126 +1,100 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <title>Kjanis HQ</title>
+<meta charset="UTF-8">
+<title>Kjanis App</title>
 
-  <style>
-    body {
-      font-family: Arial;
-      padding: 20px;
-      background: #f5f5f5;
-    }
+<style>
+body {
+  font-family: Arial;
+  background: #0f172a;
+  color: white;
+  padding: 15px;
+}
 
-    h1 {
-      margin-bottom: 20px;
-    }
+.card {
+  background: #1e293b;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
 
-    input {
-      display: block;
-      margin-bottom: 10px;
-      padding: 10px;
-      width: 250px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
+input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: none;
+}
 
-    button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      background: black;
-      color: white;
-      cursor: pointer;
-    }
+button {
+  width: 100%;
+  padding: 10px;
+  background: #22c55e;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+}
 
-    button:hover {
-      background: #333;
-    }
-
-    #list {
-      margin-top: 20px;
-    }
-
-    .item {
-      background: white;
-      padding: 10px;
-      margin-bottom: 8px;
-      border-radius: 8px;
-    }
-  </style>
+.item {
+  background: #334155;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 8px;
+}
+</style>
 </head>
 
 <body>
 
-  <h1>Kjanis HQ</h1>
+<div class="card">
+  <h2>📱 Kjanis App</h2>
+</div>
 
-  <input id="label" placeholder="Kunde / Objekt">
-  <input id="amount" placeholder="Betrag €">
+<div class="card">
+  <input id="name" placeholder="Kunde">
+  <input id="price" placeholder="Betrag €">
+  <button onclick="save()">Speichern</button>
+</div>
 
-  <button onclick="addEntry()">Speichern</button>
-
+<div class="card">
+  <h3>📋 Aufträge</h3>
   <div id="list"></div>
+</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { 
-      getFirestore, 
-      collection, 
-      addDoc, 
-      serverTimestamp, 
-      onSnapshot,
-      query,
-      orderBy
-    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<script>
+let data = JSON.parse(localStorage.getItem("data")) || [];
 
-    // 🔥 DEINE FIREBASE DATEN HIER EINTRAGEN
-    const firebaseConfig = {
-      apiKey: "DEIN_API_KEY",
-      authDomain: "kjanis-6a706.firebaseapp.com",
-      projectId: "kjanis-6a706"
-    };
+function save() {
+  let name = document.getElementById("name").value;
+  let price = document.getElementById("price").value;
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  if (!name || !price) return;
 
-    const list = document.getElementById("list");
+  data.push({ name, price });
+  localStorage.setItem("data", JSON.stringify(data));
 
-    const q = query(collection(db, "journal"), orderBy("timestamp", "desc"));
+  document.getElementById("name").value = "";
+  document.getElementById("price").value = "";
 
-    onSnapshot(q, (snapshot) => {
-      list.innerHTML = "";
+  render();
+}
 
-      snapshot.forEach(doc => {
-        const d = doc.data();
+function render() {
+  let list = document.getElementById("list");
+  list.innerHTML = "";
 
-        list.innerHTML += `
-          <div class="item">
-            <b>${d.label}</b><br>
-            ${d.amount} €
-          </div>
-        `;
-      });
-    });
+  data.forEach(d => {
+    list.innerHTML += `
+      <div class="item">
+        ${d.name} – ${d.price} €
+      </div>
+    `;
+  });
+}
 
-    window.addEntry = async () => {
-      const label = document.getElementById("label").value;
-      const amount = document.getElementById("amount").value;
-
-      if (!label || !amount) {
-        alert("Bitte alles ausfüllen");
-        return;
-      }
-
-      await addDoc(collection(db, "journal"), {
-        label: label,
-        amount: parseFloat(amount),
-        timestamp: serverTimestamp()
-      });
-
-      document.getElementById("label").value = "";
-      document.getElementById("amount").value = "";
-    };
-  </script>
+render();
+</script>
 
 </body>
 </html>
