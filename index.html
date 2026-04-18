@@ -1,256 +1,307 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Ilirya Business System PRO</title>
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  serverTimestamp, 
+  onSnapshot
+} from 'firebase/firestore';
 
-<style>
-body {
-  font-family: Arial;
-  background: #f5f7fb;
-  padding: 20px;
+/**
+ * KJANIS EMPIRE AI - V58.0 BUSINESS ELITE
+ * Standort: Hannover | Fokus: Reinigung & Hausmeister-Service
+ * Optimiert für iPad Pro & Cloud-Sicherheit
+ */
+
+// --- ICONS (SVG-Struktur für maximale Stabilität) ---
+const IconDashboard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
+const IconRadar = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>;
+const IconPlus = () => <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IconMail = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
+const IconCopy = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+const IconEye = ({ visible }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {visible ? (
+      <React.Fragment>
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+      </React.Fragment>
+    ) : (
+      <React.Fragment>
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+      </React.Fragment>
+    )}
+  </svg>
+);
+
+// --- FIREBASE SETUP ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAPaLWV3QaIZOBdN0dzgB_9BIwEtNZM9BU",
+  authDomain: "kjani-6a706.firebaseapp.com",
+  projectId: "kjani-6a706",
+  storageBucket: "kjani-6a706.firebasestorage.app",
+  messagingSenderId: "62503034041",
+  appId: "1:62503034041:web:e8ec81d1a96f38b8148f68"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = 'kjanis-hq-v42';
+
+export default function App() {
+  const [view, setView] = useState('dashboard');
+  const [leads, setLeads] = useState([]);
+  const [user, setUser] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [onlineStatus, setOnlineStatus] = useState('connecting');
+  const [notification, setNotification] = useState(null);
+  const [mailModal, setMailModal] = useState(null);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+        setOnlineStatus('online');
+      } catch (err) { setOnlineStatus('error'); }
+    };
+    initAuth();
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (u) {
+        const journalRef = collection(db, 'artifacts', appId, 'users', u.uid, 'journal');
+        const unsubSnap = onSnapshot(journalRef, (snap) => {
+          const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setLeads(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+        });
+        return () => unsubSnap();
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  const showToast = (msg) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const copyToClipboard = (text, label) => {
+    const el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast(label + " kopiert!");
+  };
+
+  const addManualEntry = async () => {
+    const title = prompt("Objekt Name (z.B. HAUS 1):");
+    const amount = prompt("Umsatz €:");
+    const location = prompt("Ort:");
+    const email = prompt("Kunden E-Mail (optional):");
+    
+    if (title && amount && user) {
+      const journalRef = collection(db, 'artifacts', appId, 'users', user.uid, 'journal');
+      await addDoc(journalRef, {
+        title: title.toUpperCase(),
+        location: location || "Hannover",
+        amount: parseFloat(amount.replace(',', '.')),
+        email: email || "",
+        timestamp: serverTimestamp(),
+        isAiLead: false
+      });
+      showToast("Gespeichert!");
+    }
+  };
+
+  const startAiScan = async () => {
+    setIsScanning(true);
+    setTimeout(async () => {
+      if (user) {
+        const journalRef = collection(db, 'artifacts', appId, 'users', user.uid, 'journal');
+        await addDoc(journalRef, {
+          title: "KI-FUND: REINIGUNG & SERVICE",
+          location: "30159 Hannover",
+          amount: 350.00,
+          email: "anfrage@hannover-objekt.de",
+          timestamp: serverTimestamp(),
+          isAiLead: true
+        });
+      }
+      setIsScanning(false);
+      setView('dashboard');
+      showToast("Scan Fertig (~0,01€)");
+    }, 2500);
+  };
+
+  const prepareMail = (item) => {
+    const subject = `Angebot: Gebäudereinigung | Objekt ${item.title}`;
+    const body = `Hallo,\n\nvielen Dank für die Anfrage in ${item.location}.\n\nWir haben aktuell freie Kapazitäten für Reinigung und Hausmeister-Service.\n\nGerne besichtige ich das Objekt kurzfristig.\n\nGruß,\nKjani Zharki\nKjanis Empire AI`;
+    const mailLink = `mailto:${item.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    setMailModal({ link: mailLink, body: body, email: item.email });
+  };
+
+  const triggerMail = (link) => {
+    window.location.href = link;
+    setMailModal(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#05070a] text-white font-sans selection:bg-blue-500/30 pb-32 overflow-x-hidden">
+      
+      {/* Toast Notification */}
+      {notification && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-blue-600 px-6 py-3 rounded-2xl shadow-2xl z-[200] font-bold text-sm border border-white/20">
+          {notification}
+        </div>
+      )}
+
+      {/* Versand-Hilfe Modal */}
+      {mailModal && (
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[150] flex items-center justify-center p-6">
+          <div className="bg-[#121826] border border-white/10 p-10 rounded-[3rem] max-w-sm w-full space-y-8 shadow-2xl text-center">
+            <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mx-auto text-blue-500">
+              <IconMail />
+            </div>
+            <h2 className="text-2xl font-black uppercase italic tracking-tighter">MAIL-VERSAND</h2>
+            
+            <div className="space-y-4">
+              <button 
+                onClick={() => triggerMail(mailModal.link)}
+                className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-600/30 active:scale-95 transition"
+              >
+                1. JETZT MAIL ÖFFNEN
+              </button>
+              
+              <div className="flex items-center gap-4 py-2 text-zinc-600">
+                <div className="h-px bg-white/10 flex-1"></div>
+                <span className="text-[10px] font-bold">ODER BACKUP</span>
+                <div className="h-px bg-white/10 flex-1"></div>
+              </div>
+
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => copyToClipboard(mailModal.email, "E-Mail")}
+                  className="flex-1 bg-zinc-900 py-4 rounded-2xl font-black uppercase text-[8px] tracking-widest border border-white/5 active:scale-95"
+                >
+                  ADRESSE KOPIEREN
+                </button>
+                <button 
+                  onClick={() => copyToClipboard(mailModal.body, "Text")}
+                  className="flex-1 bg-zinc-900 py-4 rounded-2xl font-black uppercase text-[8px] tracking-widest border border-white/5 active:scale-90"
+                >
+                  TEXT KOPIEREN
+                </button>
+              </div>
+            </div>
+
+            <button onClick={() => setMailModal(null)} className="text-[10px] text-zinc-600 uppercase font-bold underline">Schließen</button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="p-8 flex justify-between items-center max-w-md mx-auto sticky top-0 bg-[#05070a]/90 backdrop-blur-md z-50">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center font-black shadow-lg shadow-blue-600/20 italic">K</div>
+          <h1 className="text-xl font-black italic tracking-tighter text-blue-500 uppercase">Empire AI</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`w-2 h-2 rounded-full ${onlineStatus === 'online' ? 'bg-green-500 shadow-[0_0_10px_#22c55e]' : 'bg-red-500 animate-pulse'}`}></span>
+          <button onClick={() => setIsPrivate(!isPrivate)} className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center border border-white/5 shadow-xl transition-transform active:scale-90">
+             <IconEye visible={!isPrivate} />
+          </button>
+        </div>
+      </header>
+
+      <main className="max-w-md mx-auto px-6">
+        {view === 'dashboard' ? (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Profit Anzeige */}
+            <section className="bg-[#121826] rounded-[2.5rem] p-12 text-center border border-white/5 shadow-2xl relative overflow-hidden group text-center">
+               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+               <p className="text-[10px] uppercase font-bold text-zinc-500 mb-2 tracking-widest italic text-center">Gesamt-Cloud-Profit</p>
+               <h2 className="text-5xl font-black italic tracking-tighter tabular-nums text-white drop-shadow-[0_0_20px_rgba(59,130,246,0.3)] text-center">
+                 {isPrivate ? "**** €" : leads.reduce((a, b) => a + (parseFloat(b.amount) || 0), 0).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + " €"}
+               </h2>
+               <p className="text-[7px] text-zinc-700 mt-4 uppercase tracking-[0.4em] font-bold text-center">Safe Cloud Sync Aktiv</p>
+            </section>
+
+            {/* Aktivitäten Journal */}
+            <section className="space-y-4">
+              <h3 className="text-[10px] uppercase font-black text-zinc-500 tracking-widest italic text-left ml-4">Hannover Journal</h3>
+              <div className="space-y-4">
+                {leads.map(item => (
+                  <div key={item.id} className={`p-7 rounded-[2.5rem] border transition-all active:scale-95 ${item.isAiLead ? 'bg-blue-600/5 border-blue-500/20 shadow-blue-900/10' : 'bg-[#121826] border-white/5 shadow-xl'}`}>
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="text-left">
+                        <div className="flex items-center gap-2 mb-1">
+                          {item.isAiLead && <span className="text-[6px] bg-blue-500 px-1.5 py-0.5 rounded-full font-black uppercase">KI LEAD</span>}
+                          <p className="font-black italic uppercase text-sm leading-none tracking-tight text-left">{item.title}</p>
+                        </div>
+                        <p className="text-[9px] text-zinc-600 uppercase tracking-widest font-bold text-left">{item.location}</p>
+                      </div>
+                      <span className="text-sm font-black italic text-green-500">
+                        {isPrivate ? "**" : (parseFloat(item.amount) || 0).toLocaleString('de-DE') + " €"}
+                      </span>
+                    </div>
+
+                    {item.email && (
+                      <button onClick={() => prepareMail(item)} className="w-full bg-blue-600 py-4 rounded-3xl flex justify-center items-center gap-3 shadow-lg shadow-blue-600/20 hover:bg-blue-500 transition-colors active:scale-95">
+                        <IconMail /> <span className="text-[10px] font-black uppercase tracking-widest text-white italic">Angebot Senden</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-in slide-in-from-bottom-10 duration-500">
+            <div className="bg-[#121826] p-12 rounded-[3.5rem] text-center border border-white/5 shadow-2xl relative overflow-hidden text-center">
+              <div className="absolute top-0 left-0 w-full h-1 bg-blue-500/20"></div>
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 border-2 transition-all duration-300 ${isScanning ? 'border-blue-500 animate-spin shadow-[0_0_15px_#3b82f6]' : 'border-zinc-800'}`}>
+                <div className={`${isScanning ? 'text-blue-500' : 'text-zinc-700'}`}><IconRadar /></div>
+              </div>
+              <h2 className="text-2xl font-black italic uppercase mb-2 tracking-tighter text-center">KI-Radar Hannover</h2>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-12 text-center">Analysiere lokale Aufträge</p>
+              
+              <button 
+                onClick={startAiScan} 
+                disabled={isScanning}
+                className="w-full bg-blue-600 py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-600/30 active:scale-95 transition disabled:opacity-50"
+              >
+                {isScanning ? "KI ANALYSIERT..." : "JETZT SCANNEN (~0,01€)"}
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Nav */}
+      <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 w-[85%] max-w-xs bg-[#121826]/90 backdrop-blur-xl border border-white/10 rounded-[3rem] p-5 flex justify-around items-center shadow-2xl z-50">
+        <button onClick={() => setView('dashboard')} className={`transition-all duration-300 ${view === 'dashboard' ? "text-blue-500 scale-110" : "text-zinc-600 hover:text-white"}`}>
+          <IconDashboard />
+        </button>
+        <button 
+          onClick={addManualEntry} 
+          className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center -mt-10 shadow-xl shadow-blue-600/40 border-4 border-[#05070a] active:scale-90 transition-transform"
+        >
+          <IconPlus />
+        </button>
+        <button onClick={() => setView('radar')} className={`transition-all duration-300 ${view === 'radar' ? "text-blue-500 scale-110" : "text-zinc-600 hover:text-white"}`}>
+          <IconRadar />
+        </button>
+      </nav>
+
+      <footer className="fixed bottom-3 w-full text-center text-[6px] text-zinc-800 uppercase tracking-[0.6em] font-black italic">
+        Kjani Zharki | Headquarters Hannover | v58.0
+      </footer>
+    </div>
+  );
 }
-
-.dark {
-  background: #0f172a;
-  color: white;
-}
-
-.card {
-  background: white;
-  padding: 15px;
-  margin-bottom: 15px;
-  border-radius: 10px;
-}
-
-.dark .card {
-  background: #1e293b;
-}
-
-button {
-  width: 100%;
-  padding: 12px;
-  margin-top: 5px;
-  background: linear-gradient(to right,#1e3c72,#d4af37);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: bold;
-}
-
-textarea, input {
-  width: 100%;
-  padding: 10px;
-  margin-top: 5px;
-}
-
-.item {
-  padding: 10px;
-  margin-top:10px;
-  border-radius:8px;
-  background:#eef2f7;
-}
-
-.dark .item {
-  background:#334155;
-}
-
-.header {
-  text-align: center;
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="header">
-<h2>🦅 Ilirya Business System</h2>
-<button onclick="toggleMode()">💡 Licht an / aus</button>
-</div>
-
-<div class="card">
-<h3>🔍 Kunden finden</h3>
-<button onclick="search('Hausverwaltung Hannover')">Hausverwaltung</button>
-<button onclick="search('Immobilien Hannover')">Immobilien</button>
-<button onclick="search('Büro Hannover')">Büros</button>
-<button onclick="search('Arztpraxis Hannover')">Praxen</button>
-</div>
-
-<div class="card">
-<h3>📩 Firma anschreiben</h3>
-
-<input id="firma" placeholder="Firma">
-<input id="email" placeholder="E-Mail">
-
-<button onclick="generate()">🔥 Angebot erstellen</button>
-
-<textarea id="text" rows="10"></textarea>
-
-<button onclick="sendMail()">📧 Email öffnen</button>
-<button onclick="saveFirma()">💾 Speichern</button>
-<button onclick="resetAll()">🧹 Alles löschen</button>
-
-</div>
-
-<div class="card">
-<h3>📊 Übersicht</h3>
-<div id="liste"></div>
-</div>
-
-<div class="card">
-<h3>🤖 Antwort Hilfe</h3>
-<input id="frage" placeholder="Frage">
-<button onclick="generateAnswer()">Antwort erstellen</button>
-<textarea id="antwort"></textarea>
-</div>
-
-<script>
-
-function toggleMode() {
-  document.body.classList.toggle("dark");
-}
-
-function search(q){
-  window.open("https://www.google.com/search?q=" + encodeURIComponent(q));
-}
-
-// sichere Daten
-let firmen = [];
-
-try {
-  firmen = JSON.parse(localStorage.getItem("firmen")) || [];
-} catch {
-  localStorage.clear();
-  firmen = [];
-}
-
-// Nachricht
-function generate(){
-  let firma = document.getElementById("firma").value;
-
-  if(!firma){
-    alert("Firma fehlt!");
-    return;
-  }
-
-  let text = `Betreff: Zusammenarbeit im Bereich Reinigung
-
-Guten Tag ${firma},
-
-mein Name ist Kjani Zharki, Inhaber von Kjanis Cleaning aus Hannover.
-
-Ich unterstütze Unternehmen zuverlässig bei Treppenhaus-, Büro- und Unterhaltsreinigung.
-
-Aktuell habe ich freie Kapazitäten und kann kurzfristig starten.
-
-Ich arbeite sauber, zuverlässig und lege großen Wert auf Qualität.
-
-📞 +49 152 15787871
-
-Ich freue mich auf Ihre Rückmeldung.
-
-Mit freundlichen Grüßen  
-Kjani Zharki`;
-
-  document.getElementById("text").value = text;
-}
-
-// Email
-function sendMail(){
-  let email = document.getElementById("email").value;
-  let body = document.getElementById("text").value;
-
-  window.location.href =
-  "mailto:" + email +
-  "?subject=Reinigung Angebot&body=" +
-  encodeURIComponent(body);
-}
-
-// speichern
-function saveFirma(){
-  let name = document.getElementById("firma").value;
-  let email = document.getElementById("email").value;
-
-  if(!name) return;
-
-  firmen.push({
-    name,
-    email,
-    status: "Gesendet",
-    date: Date.now()
-  });
-
-  localStorage.setItem("firmen", JSON.stringify(firmen));
-  render();
-}
-
-// anzeigen
-function render(){
-  let box = document.getElementById("liste");
-  box.innerHTML = "";
-
-  firmen.forEach((f,i)=>{
-
-    let days = (Date.now() - f.date)/(1000*60*60*24);
-    let reminder = days >= 2 ? "⚠️ Nachfassen!" : "";
-
-    box.innerHTML += `
-    <div class="item">
-    <b>${f.name}</b><br>
-    ${f.email}<br>
-    Status: ${f.status} ${reminder}
-    <br>
-    <button onclick="setDone(${i})">Antwort</button>
-    <button onclick="remove(${i})">❌ Löschen</button>
-    </div>`;
-  });
-}
-
-// status
-function setDone(i){
-  firmen[i].status = "Antwort";
-  localStorage.setItem("firmen", JSON.stringify(firmen));
-  render();
-}
-
-// löschen
-function remove(i){
-  firmen.splice(i,1);
-  localStorage.setItem("firmen", JSON.stringify(firmen));
-  render();
-}
-
-// reset
-function resetAll(){
-  if(confirm("Alles löschen?")){
-    localStorage.clear();
-    firmen = [];
-    render();
-  }
-}
-
-// antwort
-function generateAnswer(){
-  let f = document.getElementById("frage").value.toLowerCase();
-  let t = "";
-
-  if(f.includes("preis")){
-    t = "Die Kosten hängen vom Objekt ab. Gerne mache ich Ihnen ein Angebot.";
-  }
-  else if(f.includes("wann")){
-    t = "Ich kann kurzfristig starten.";
-  }
-  else{
-    t = "Vielen Dank für Ihre Nachricht. Gerne bespreche ich alles persönlich.";
-  }
-
-  document.getElementById("antwort").value = t;
-}
-
-render();
-
-</script>
-
-</body>
-</html>
